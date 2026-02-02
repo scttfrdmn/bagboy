@@ -273,7 +273,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [x] Scoop bucket management
 - [x] Winget PR automation
 
-#### **v0.4.0 - Code Signing** ✨ **Current**
+#### **v0.4.0 - Code Signing** ✅ **Completed**
 - [x] Multi-platform code signing (macOS, Windows, Linux)
 - [x] Sigstore/Cosign keyless signing
 - [x] SignPath.io cloud signing
@@ -281,13 +281,13 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ### 🚧 **Upcoming Milestones**
 
-#### **v0.5.0 - Complete Package Formats** (Target: March 2026)
-- [ ] DMG packager for macOS
-- [ ] Snap packager for Linux
-- [ ] Flatpak packager for Linux  
-- [ ] MSIX packager for Windows
+#### **v0.5.0 - Complete Package Formats** ✅ **Completed**
+- [x] DMG packager for macOS
+- [x] Snap packager for Linux
+- [x] Flatpak packager for Linux  
+- [x] MSIX packager for Windows
 
-#### **v0.6.0 - Quality & Performance** (Target: April 2026)
+#### **v0.6.0 - Quality & Performance** ✨ **Current** (Target: April 2026)
 - [ ] Increase test coverage to 60%+
 - [ ] Performance benchmarks and optimization
 - [ ] Comprehensive documentation
