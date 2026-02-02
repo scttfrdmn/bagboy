@@ -258,6 +258,39 @@ func (s *Signer) SignBinary(ctx context.Context, binaryPath string) error {
 	}
 }
 
+func (s *Signer) SignAllBinaries(ctx context.Context) error {
+	if s.config == nil {
+		return fmt.Errorf("no configuration provided")
+	}
+
+	var errors []string
+	for arch, binaryPath := range s.config.Binaries {
+		fmt.Printf("Signing %s binary: %s\n", arch, binaryPath)
+		
+		// Sign based on target platform
+		var err error
+		if strings.HasPrefix(arch, "darwin-") {
+			err = s.signMacOSBinary(ctx, binaryPath)
+		} else if strings.HasPrefix(arch, "windows-") {
+			err = s.signWindowsBinary(ctx, binaryPath)
+		} else if strings.HasPrefix(arch, "linux-") {
+			err = s.signLinuxBinary(ctx, binaryPath)
+		} else {
+			err = fmt.Errorf("unsupported architecture: %s", arch)
+		}
+
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", arch, err))
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("signing failed for some binaries:\n%s", strings.Join(errors, "\n"))
+	}
+
+	return nil
+}
+
 func (s *Signer) signMacOSBinary(ctx context.Context, binaryPath string) error {
 	identity := os.Getenv("APPLE_DEVELOPER_ID")
 	if identity == "" {
@@ -405,6 +438,60 @@ func (s *Signer) PrintSigningReport(results map[string]SigningStatus) {
 	fmt.Println("   • Sigstore: Keyless signing with transparency log")
 	fmt.Println("   • SignPath.io: Cloud-based signing service")
 	fmt.Println("   • Git: Commit and tag verification")
+}
+
+func (s *Signer) SignWithSigstore(ctx context.Context, binaryPath string) error {
+	if !s.config.Signing.Sigstore.Enabled {
+		return fmt.Errorf("Sigstore signing not enabled")
+	}
+
+	// Check if cosign is available
+	if _, err := exec.LookPath("cosign"); err != nil {
+		return fmt.Errorf("cosign not found - install with: go install github.com/sigstore/cosign/v2/cmd/cosign@latest")
+	}
+
+	args := []string{"sign-blob", "--yes"}
+	
+	if s.config.Signing.Sigstore.Keyless {
+		args = append(args, "--bundle", binaryPath+".sigstore.bundle")
+	}
+	
+	args = append(args, binaryPath)
+
+	cmd := exec.CommandContext(ctx, "cosign", args...)
+	
+	// Set OIDC issuer if specified
+	if s.config.Signing.Sigstore.OIDCIssuer != "" {
+		cmd.Env = append(os.Environ(), "COSIGN_OIDC_ISSUER="+s.config.Signing.Sigstore.OIDCIssuer)
+	}
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("cosign signing failed: %w\nOutput: %s", err, output)
+	}
+
+	fmt.Printf("✅ Signed with Sigstore: %s\n", binaryPath)
+	return nil
+}
+
+func (s *Signer) SignWithGit(ctx context.Context, tagName string) error {
+	if !s.config.Signing.Git.Enabled {
+		return nil
+	}
+
+	if s.config.Signing.Git.SignTags && tagName != "" {
+		cmd := exec.CommandContext(ctx, "git", "tag", "-s", tagName, "-m", fmt.Sprintf("Signed release %s", tagName))
+		if s.config.Signing.Git.GPGKeyID != "" {
+			cmd = exec.CommandContext(ctx, "git", "tag", "-s", "-u", s.config.Signing.Git.GPGKeyID, tagName, "-m", fmt.Sprintf("Signed release %s", tagName))
+		}
+
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git tag signing failed: %w\nOutput: %s", err, output)
+		}
+
+		fmt.Printf("✅ Signed git tag: %s\n", tagName)
+	}
+
+	return nil
 }
 
 func (s *Signer) checkSigstore() SigningStatus {

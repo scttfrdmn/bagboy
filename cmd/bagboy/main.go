@@ -140,6 +140,7 @@ var packCmd = &cobra.Command{
 	Short: "Create packages",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		all, _ := cmd.Flags().GetBool("all")
+		sign, _ := cmd.Flags().GetBool("sign")
 		brewFlag, _ := cmd.Flags().GetBool("brew")
 		scoopFlag, _ := cmd.Flags().GetBool("scoop")
 		debFlag, _ := cmd.Flags().GetBool("deb")
@@ -194,6 +195,26 @@ var packCmd = &cobra.Command{
 		registry.Register(installer.New())
 
 		ctx := context.Background()
+
+		// Sign binaries first if requested
+		if sign {
+			fmt.Println("🔐 Signing binaries...")
+			signer := signing.NewSigner(cfg)
+			if err := signer.SignAllBinaries(ctx); err != nil {
+				fmt.Printf("⚠️  Signing failed: %v\n", err)
+				// Continue with packaging even if signing fails
+			}
+
+			// Sigstore signing if enabled
+			if cfg.Signing.Sigstore.Enabled {
+				for arch, binaryPath := range cfg.Binaries {
+					fmt.Printf("Signing %s with Sigstore...\n", arch)
+					if err := signer.SignWithSigstore(ctx, binaryPath); err != nil {
+						fmt.Printf("⚠️  Sigstore signing failed for %s: %v\n", arch, err)
+					}
+				}
+			}
+		}
 
 		if all {
 			results, err := registry.PackAll(ctx, cfg)
@@ -638,6 +659,7 @@ func init() {
 	initCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
 
 	packCmd.Flags().Bool("all", false, "Create all package types")
+	packCmd.Flags().Bool("sign", false, "Sign binaries before packaging")
 	packCmd.Flags().Bool("brew", false, "Create Homebrew formula")
 	packCmd.Flags().Bool("scoop", false, "Create Scoop manifest")
 	packCmd.Flags().Bool("deb", false, "Create DEB package")
