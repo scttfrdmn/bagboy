@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/scttfrdmn/bagboy/pkg/config"
@@ -482,6 +483,34 @@ var publishCmd = &cobra.Command{
 					fmt.Printf("⚠️  Failed to update bucket: %v\n", err)
 				} else {
 					fmt.Printf("✅ Updated Scoop bucket: %s\n", cfg.GitHub.Bucket.Repo)
+				}
+			}
+
+			// Submit Winget PR
+			if cfg.GitHub.Winget.Enabled && cfg.GitHub.Winget.AutoPR {
+				fmt.Println("Submitting Winget PR...")
+				wingetResult, exists := results["winget"]
+				if exists && wingetResult != "" {
+					// Read all manifest files from the winget output directory
+					manifests := make(map[string]string)
+					manifestFiles := []string{
+						fmt.Sprintf("%s.yaml", cfg.Packages.Winget.PackageIdentifier),
+						fmt.Sprintf("%s.installer.yaml", cfg.Packages.Winget.PackageIdentifier),
+						fmt.Sprintf("%s.locale.en-US.yaml", cfg.Packages.Winget.PackageIdentifier),
+					}
+					
+					for _, filename := range manifestFiles {
+						manifestPath := filepath.Join(wingetResult, filename)
+						if content, err := os.ReadFile(manifestPath); err == nil {
+							manifests[filename] = string(content)
+						}
+					}
+					
+					if len(manifests) > 0 {
+						if err := client.SubmitWingetPR(ctx, cfg, manifests); err != nil {
+							fmt.Printf("⚠️  Failed to submit Winget PR: %v\n", err)
+						}
+					}
 				}
 			}
 		}
