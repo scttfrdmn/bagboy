@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/scttfrdmn/bagboy/pkg/config"
@@ -211,6 +212,19 @@ var packCmd = &cobra.Command{
 					fmt.Printf("Signing %s with Sigstore...\n", arch)
 					if err := signer.SignWithSigstore(ctx, binaryPath); err != nil {
 						fmt.Printf("⚠️  Sigstore signing failed for %s: %v\n", arch, err)
+					}
+				}
+			}
+
+			// SignPath.io signing if enabled
+			if cfg.Signing.SignPath.Enabled {
+				for arch, binaryPath := range cfg.Binaries {
+					// Only sign Windows binaries with SignPath.io (typical use case)
+					if strings.HasPrefix(arch, "windows-") {
+						fmt.Printf("Signing %s with SignPath.io...\n", arch)
+						if err := signer.SignWithSignPath(ctx, binaryPath); err != nil {
+							fmt.Printf("⚠️  SignPath.io signing failed for %s: %v\n", arch, err)
+						}
 					}
 				}
 			}

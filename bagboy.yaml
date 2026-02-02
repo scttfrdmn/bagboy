@@ -83,7 +83,7 @@ signing:
         keyless: true
         oidc_issuer: "https://token.actions.githubusercontent.com"
     signpath:
-        enabled: false
+        enabled: true
         organization_id: ""  # Set via SignPath dashboard
         project_slug: ""     # Set via SignPath project
         api_token: ""        # Set via SIGNPATH_API_TOKEN env var

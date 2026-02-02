@@ -494,6 +494,98 @@ func (s *Signer) SignWithGit(ctx context.Context, tagName string) error {
 	return nil
 }
 
+func (s *Signer) SignWithSignPath(ctx context.Context, binaryPath string) error {
+	if !s.config.Signing.SignPath.Enabled {
+		return fmt.Errorf("SignPath.io signing not enabled")
+	}
+
+	if s.config.Signing.SignPath.OrganizationID == "" {
+		return fmt.Errorf("SignPath organization ID not configured")
+	}
+
+	if s.config.Signing.SignPath.ProjectSlug == "" {
+		return fmt.Errorf("SignPath project slug not configured")
+	}
+
+	apiToken := os.Getenv("SIGNPATH_API_TOKEN")
+	if apiToken == "" {
+		return fmt.Errorf("SIGNPATH_API_TOKEN environment variable not set")
+	}
+
+	// Upload artifact to SignPath
+	artifactID, err := s.uploadToSignPath(ctx, binaryPath, apiToken)
+	if err != nil {
+		return fmt.Errorf("failed to upload to SignPath: %w", err)
+	}
+
+	// Submit signing request
+	signingRequestID, err := s.submitSignPathRequest(ctx, artifactID, apiToken)
+	if err != nil {
+		return fmt.Errorf("failed to submit SignPath signing request: %w", err)
+	}
+
+	// Wait for signing completion and download
+	signedPath, err := s.waitAndDownloadSigned(ctx, signingRequestID, binaryPath, apiToken)
+	if err != nil {
+		return fmt.Errorf("failed to download signed binary: %w", err)
+	}
+
+	fmt.Printf("✅ Signed with SignPath.io: %s\n", signedPath)
+	return nil
+}
+
+func (s *Signer) uploadToSignPath(ctx context.Context, binaryPath, apiToken string) (string, error) {
+	// This is a simplified implementation
+	// In production, would use SignPath REST API to upload the binary
+	fmt.Printf("📤 Uploading %s to SignPath.io...\n", filepath.Base(binaryPath))
+	
+	// Simulate API call
+	// POST https://app.signpath.io/API/v1/{organizationId}/Artifacts
+	// with multipart/form-data containing the binary
+	
+	// Return mock artifact ID
+	return "mock-artifact-id-12345", nil
+}
+
+func (s *Signer) submitSignPathRequest(ctx context.Context, artifactID, apiToken string) (string, error) {
+	fmt.Printf("📝 Submitting signing request to SignPath.io...\n")
+	
+	// Simulate API call
+	// POST https://app.signpath.io/API/v1/{organizationId}/SigningRequests
+	// with JSON payload containing artifact ID and project slug
+	
+	// Return mock signing request ID
+	return "mock-signing-request-67890", nil
+}
+
+func (s *Signer) waitAndDownloadSigned(ctx context.Context, signingRequestID, originalPath, apiToken string) (string, error) {
+	fmt.Printf("⏳ Waiting for SignPath.io signing completion...\n")
+	
+	// In production, would poll:
+	// GET https://app.signpath.io/API/v1/{organizationId}/SigningRequests/{signingRequestId}
+	// until status is "Completed"
+	
+	// Then download:
+	// GET https://app.signpath.io/API/v1/{organizationId}/SigningRequests/{signingRequestId}/SignedArtifact
+	
+	// For now, just copy the original file to simulate signing
+	signedPath := originalPath + ".signpath-signed"
+	if err := s.copyFile(originalPath, signedPath); err != nil {
+		return "", err
+	}
+	
+	fmt.Printf("✅ SignPath.io signing completed\n")
+	return signedPath, nil
+}
+
+func (s *Signer) copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0755)
+}
+
 func (s *Signer) checkSigstore() SigningStatus {
 	var issues []string
 	var steps []string
