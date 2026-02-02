@@ -250,20 +250,60 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🎯 Roadmap
 
-- [x] Core CLI and configuration
+### ✅ **Completed Milestones**
+
+#### **v0.1.0 - Foundation** 
+- [x] Core CLI and configuration system
+- [x] Extensible packager registry pattern
+- [x] 18+ package format support structure
+
+#### **v0.2.0 - Core Package Formats**
 - [x] Homebrew formula generation
 - [x] Scoop manifest generation  
 - [x] DEB package creation
-- [x] curl|bash installer scripts
+- [x] RPM package creation
+- [x] AppImage building
+- [x] MSI package creation
+- [x] Chocolatey packages
+- [x] Winget manifest generation
+
+#### **v0.3.0 - GitHub Integration**
 - [x] GitHub release automation
-- [x] Code signing integration
-- [ ] RPM package creation
-- [ ] AppImage building
-- [ ] Windows MSI creation
-- [ ] macOS DMG creation
-- [ ] Chocolatey packages
-- [ ] Winget manifest + PR automation
+- [x] Homebrew tap management
+- [x] Scoop bucket management
+- [x] Winget PR automation
+
+#### **v0.4.0 - Code Signing** ✨ **Current**
+- [x] Multi-platform code signing (macOS, Windows, Linux)
+- [x] Sigstore/Cosign keyless signing
+- [x] SignPath.io cloud signing
+- [x] Git tag signing integration
+
+### 🚧 **Upcoming Milestones**
+
+#### **v0.5.0 - Complete Package Formats** (Target: March 2026)
+- [ ] DMG packager for macOS
+- [ ] Snap packager for Linux
+- [ ] Flatpak packager for Linux  
+- [ ] MSIX packager for Windows
+
+#### **v0.6.0 - Quality & Performance** (Target: April 2026)
+- [ ] Increase test coverage to 60%+
+- [ ] Performance benchmarks and optimization
+- [ ] Comprehensive documentation
+- [ ] Enhanced CLI user experience
+
+#### **v0.7.0 - Advanced Features** (Target: May 2026)
 - [ ] Checksum generation and verification
+- [ ] Package validation functionality
+- [ ] Deployment automation and CI/CD integration
+- [ ] Configuration templates and presets
+
+#### **v1.0.0 - Production Ready** (Target: July 2026)
+- [ ] Final polish and production hardening
+- [ ] Comprehensive testing and validation
+- [ ] Performance optimization
+- [ ] Enterprise-grade reliability
 
 ## 📚 Documentation
 
