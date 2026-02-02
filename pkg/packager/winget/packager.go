@@ -25,6 +25,20 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Packages.Winget.PackageIdentifier == "" {
 		return fmt.Errorf("winget.package_identifier is required")
 	}
+	if cfg.Packages.Winget.Publisher == "" {
+		return fmt.Errorf("winget.publisher is required")
+	}
+	// Check for Windows binary
+	hasWindowsBinary := false
+	for arch := range cfg.Binaries {
+		if strings.HasPrefix(arch, "windows-") {
+			hasWindowsBinary = true
+			break
+		}
+	}
+	if !hasWindowsBinary {
+		return fmt.Errorf("no Windows binary specified for Winget package")
+	}
 	return nil
 }
 
