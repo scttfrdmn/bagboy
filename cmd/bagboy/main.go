@@ -27,6 +27,7 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/benchmark"
 	"github.com/scttfrdmn/bagboy/pkg/config"
 	"github.com/scttfrdmn/bagboy/pkg/deploy"
+	"github.com/scttfrdmn/bagboy/pkg/errors"
 	"github.com/scttfrdmn/bagboy/pkg/requirements"
 	"github.com/scttfrdmn/bagboy/pkg/signing"
 	"github.com/scttfrdmn/bagboy/pkg/github"
@@ -59,6 +60,8 @@ var rootCmd = &cobra.Command{
 	Use:   "bagboy",
 	Short: "Universal software packager",
 	Long:  "Pack once. Ship everywhere. Universal software distribution made simple.",
+	SilenceErrors: true,  // We handle errors ourselves
+	SilenceUsage:  true,  // Don't show usage on errors
 }
 
 var initCmd = &cobra.Command{
@@ -680,16 +683,22 @@ var validateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		configPath, err := config.FindConfigFile()
 		if err != nil {
-			return err
+			return errors.NewConfigurationError("CONFIG_NOT_FOUND", "No bagboy configuration file found", 
+				"Run 'bagboy init' to create a new configuration",
+				"Ensure bagboy.yaml exists in the current directory")
 		}
 
 		cfg, err := config.Load(configPath)
 		if err != nil {
-			return err
+			return errors.WrapError(err, "Failed to load configuration file", 
+				"Check the syntax of your bagboy.yaml file",
+				"Run 'bagboy init' to regenerate the configuration")
 		}
 
 		if err := cfg.Validate(); err != nil {
-			return fmt.Errorf("validation failed: %w", err)
+			return errors.WrapError(err, "Configuration validation failed", 
+				"Fix the issues in your bagboy.yaml file",
+				"Run 'bagboy init' to regenerate with correct structure")
 		}
 
 		fmt.Println("✅ Configuration is valid")
@@ -769,7 +778,8 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		// Use improved error formatting
+		fmt.Fprint(os.Stderr, errors.FormatError(err))
 		os.Exit(1)
 	}
 }

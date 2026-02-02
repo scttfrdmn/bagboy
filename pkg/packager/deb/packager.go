@@ -13,6 +13,7 @@ import (
 
 	"github.com/blakesmith/ar"
 	"github.com/scttfrdmn/bagboy/pkg/config"
+	"github.com/scttfrdmn/bagboy/pkg/errors"
 )
 
 type Packager struct{}
@@ -27,7 +28,7 @@ func (p *Packager) Name() string {
 
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Packages.Deb.Maintainer == "" {
-		return fmt.Errorf("deb.maintainer is required")
+		return errors.InvalidConfigError("deb.maintainer", "maintainer email is required for DEB packages")
 	}
 	return nil
 }
@@ -71,7 +72,7 @@ func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error)
 	}
 
 	if linuxBinary == "" {
-		return "", fmt.Errorf("no Linux binary found")
+		return "", errors.MissingBinaryError("linux")
 	}
 
 	// Copy binary
