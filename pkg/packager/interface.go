@@ -39,6 +39,10 @@ func (r *Registry) List() []string {
 	return names
 }
 
+func (r *Registry) Count() int {
+	return len(r.packagers)
+}
+
 func (r *Registry) PackAll(ctx context.Context, cfg *config.Config) (map[string]string, error) {
 	results := make(map[string]string)
 

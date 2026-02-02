@@ -30,6 +30,7 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/errors"
 	"github.com/scttfrdmn/bagboy/pkg/requirements"
 	"github.com/scttfrdmn/bagboy/pkg/signing"
+	"github.com/scttfrdmn/bagboy/pkg/ui"
 	"github.com/scttfrdmn/bagboy/pkg/github"
 	initpkg "github.com/scttfrdmn/bagboy/pkg/init"
 	"github.com/scttfrdmn/bagboy/pkg/packager"
@@ -59,18 +60,47 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "bagboy",
 	Short: "Universal software packager",
-	Long:  "Pack once. Ship everywhere. Universal software distribution made simple.",
+	Long: `🎒 bagboy - Universal Software Packager
+
+Pack once. Ship everywhere.
+
+bagboy creates packages for all major platforms from a single configuration file.
+Supports 20+ package formats including Homebrew, Scoop, DEB, RPM, Docker, and more.
+
+Examples:
+  bagboy init                    # Initialize new project
+  bagboy pack --all              # Create all package formats
+  bagboy pack --brew --deb       # Create specific formats
+  bagboy publish                 # Pack and publish to registries
+  bagboy sign --check            # Check code signing setup
+  bagboy benchmark               # Run performance benchmarks
+
+Learn more: https://bagboy.dev`,
 	SilenceErrors: true,  // We handle errors ourselves
 	SilenceUsage:  true,  // Don't show usage on errors
 }
 
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize a new bagboy project",
+	Use:     "init",
+	Aliases: []string{"i", "new", "create"},
+	Short:   "Initialize a new bagboy project",
+	Long: `Initialize a new bagboy project with smart detection.
+
+Automatically detects:
+• Project type (Go, Node.js, Rust, Python)
+• Project metadata (name, version, description)
+• GitHub repository information
+• Existing binary locations
+
+Examples:
+  bagboy init                    # Auto-detect project settings
+  bagboy init --interactive      # Interactive configuration
+  bagboy init --name myapp       # Override detected name`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		interactive, _ := cmd.Flags().GetBool("interactive")
 
-		fmt.Println("🎒 Initializing bagboy project...")
+		ui.PrintBanner()
+		ui.Info("Initializing bagboy project...")
 
 		info, err := initpkg.DetectProject()
 		if err != nil {
@@ -133,6 +163,14 @@ var initCmd = &cobra.Command{
 		}
 
 		fmt.Println("✅ Created bagboy.yaml")
+		
+		ui.Header("Next Steps")
+		fmt.Println("1. Review and customize bagboy.yaml")
+		fmt.Println("2. Build your binaries for target platforms")
+		fmt.Println("3. Run 'bagboy pack --all' to create packages")
+		fmt.Println("4. Run 'bagboy publish' to distribute everywhere")
+		fmt.Println()
+		ui.Info("Learn more at https://bagboy.dev")
 		fmt.Println("\nNext steps:")
 		fmt.Println("  1. Review and edit bagboy.yaml")
 		fmt.Println("  2. Build your binaries")
@@ -143,8 +181,23 @@ var initCmd = &cobra.Command{
 }
 
 var packCmd = &cobra.Command{
-	Use:   "pack",
-	Short: "Create packages",
+	Use:     "pack",
+	Aliases: []string{"p", "package", "build"},
+	Short:   "Create packages for distribution",
+	Long: `Create packages for various platforms and package managers.
+
+Supports 20+ package formats including:
+• Package Managers: Homebrew, Scoop, Chocolatey, Winget
+• Linux Packages: DEB, RPM, AppImage, Snap, Flatpak
+• Containers: Docker, Apptainer
+• Language Packages: npm, PyPI, Cargo, Nix, Spack
+• Platform Installers: DMG, MSI, MSIX, curl|bash
+
+Examples:
+  bagboy pack --all              # Create all supported formats
+  bagboy pack --brew --scoop     # Create Homebrew and Scoop packages
+  bagboy pack --deb --rpm        # Create Linux packages
+  bagboy pack --docker --sign    # Create Docker image with signing`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		all, _ := cmd.Flags().GetBool("all")
 		sign, _ := cmd.Flags().GetBool("sign")
@@ -241,15 +294,32 @@ var packCmd = &cobra.Command{
 		}
 
 		if all {
+			ui.Header("Creating All Package Formats")
+			
+			// Get total count for progress
+			totalPackagers := registry.Count()
+			progress := ui.NewProgressBar(totalPackagers, "📦 Packaging")
+			
 			results, err := registry.PackAll(ctx, cfg)
+			progress.Finish()
+			
 			if err != nil {
 				return err
 			}
 
-			fmt.Println("✅ Created packages:")
+			ui.Success(fmt.Sprintf("Created %d packages", len(results)))
+			
+			// Display results in a table
+			table := ui.NewTable([]string{"Format", "Output Path", "Status"})
 			for name, path := range results {
-				fmt.Printf("  %s: %s\n", name, path)
+				status := "✅ Success"
+				if path == "" {
+					status = "⚠️  Skipped"
+				}
+				table.AddRow([]string{name, path, status})
 			}
+			table.Print()
+			
 			return nil
 		}
 
@@ -459,10 +529,32 @@ var packCmd = &cobra.Command{
 }
 
 var publishCmd = &cobra.Command{
-	Use:   "publish",
-	Short: "Pack all formats and create GitHub release",
+	Use:     "publish",
+	Aliases: []string{"pub", "release", "deploy"},
+	Short:   "Pack all formats and create GitHub release",
+	Long: `Complete publishing workflow: pack, release, and distribute.
+
+This command will:
+• Create all package formats
+• Create GitHub release with assets
+• Update Homebrew tap (if configured)
+• Update Scoop bucket (if configured)
+• Submit Winget PR (if configured)
+
+Examples:
+  bagboy publish                # Full publish workflow
+  bagboy publish --dry-run      # Preview what would happen
+  bagboy publish --skip-github  # Skip GitHub operations`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		skipGitHub, _ := cmd.Flags().GetBool("skip-github")
+
+		if dryRun {
+			ui.Warning("DRY RUN MODE - No changes will be made")
+		}
+
+		ui.PrintBanner()
+		ui.Header("Publishing Workflow")
 
 		configPath, err := config.FindConfigFile()
 		if err != nil {
@@ -476,6 +568,17 @@ var publishCmd = &cobra.Command{
 
 		if err := cfg.Validate(); err != nil {
 			return fmt.Errorf("config validation failed: %w", err)
+		}
+
+		if dryRun {
+			ui.Info("Would create packages for:")
+			for _, format := range []string{"brew", "scoop", "deb", "rpm", "docker"} {
+				ui.Info(fmt.Sprintf("  • %s", format))
+			}
+			if !skipGitHub && cfg.GitHub.Owner != "" {
+				ui.Info("Would create GitHub release and update repositories")
+			}
+			return nil
 		}
 
 		fmt.Println("🚀 Publishing", cfg.Name, cfg.Version)
@@ -678,36 +781,72 @@ var signCmd = &cobra.Command{
 }
 
 var validateCmd = &cobra.Command{
-	Use:   "validate",
-	Short: "Validate bagboy configuration",
+	Use:     "validate",
+	Aliases: []string{"v", "check", "verify"},
+	Short:   "Validate bagboy configuration",
+	Long: `Validate your bagboy.yaml configuration file.
+
+Checks for:
+• Valid YAML syntax
+• Required fields (name, version, binaries)
+• Binary file existence
+• GitHub repository access (if configured)
+• Package format compatibility
+
+Examples:
+  bagboy validate               # Validate current configuration
+  bagboy validate --verbose     # Show detailed validation info`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		
+		ui.Header("Validating Configuration")
+		
 		configPath, err := config.FindConfigFile()
 		if err != nil {
+			ui.Error("No bagboy configuration file found")
+			ui.Info("Run 'bagboy init' to create a new configuration")
 			return errors.NewConfigurationError("CONFIG_NOT_FOUND", "No bagboy configuration file found", 
 				"Run 'bagboy init' to create a new configuration",
 				"Ensure bagboy.yaml exists in the current directory")
 		}
 
+		if verbose {
+			ui.Info(fmt.Sprintf("Found config file: %s", configPath))
+		}
+
 		cfg, err := config.Load(configPath)
 		if err != nil {
+			ui.Error("Failed to load configuration file")
 			return errors.WrapError(err, "Failed to load configuration file", 
 				"Check the syntax of your bagboy.yaml file",
 				"Run 'bagboy init' to regenerate the configuration")
 		}
 
 		if err := cfg.Validate(); err != nil {
+			ui.Error("Configuration validation failed")
 			return errors.WrapError(err, "Configuration validation failed", 
 				"Fix the issues in your bagboy.yaml file",
 				"Run 'bagboy init' to regenerate with correct structure")
 		}
 
-		fmt.Println("✅ Configuration is valid")
+		ui.Success("Configuration is valid")
+		
+		if verbose {
+			ui.Info(fmt.Sprintf("Project: %s v%s", cfg.Name, cfg.Version))
+			ui.Info(fmt.Sprintf("Binaries: %d configured", len(cfg.Binaries)))
+			if cfg.GitHub.Owner != "" {
+				ui.Info(fmt.Sprintf("GitHub: %s/%s", cfg.GitHub.Owner, cfg.GitHub.Repo))
+			}
+		}
+		
 		return nil
 	},
 }
 
 func init() {
 	initCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
+
+	validateCmd.Flags().BoolP("verbose", "v", false, "Show detailed validation information")
 
 	packCmd.Flags().Bool("all", false, "Create all package types")
 	packCmd.Flags().Bool("sign", false, "Sign binaries before packaging")
@@ -733,6 +872,7 @@ func init() {
 	packCmd.Flags().Bool("installer", false, "Create curl|bash installer")
 
 	publishCmd.Flags().Bool("dry-run", false, "Show what would be done without executing")
+	publishCmd.Flags().Bool("skip-github", false, "Skip GitHub operations (release, tap, bucket)")
 	
 	checkCmd.Flags().StringSlice("formats", []string{}, "Package formats to check (default: all)")
 	
@@ -766,6 +906,16 @@ func init() {
 		},
 	}
 
+	var versionCmd = &cobra.Command{
+		Use:     "version",
+		Aliases: []string{"v", "--version"},
+		Short:   "Show version information",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ui.PrintVersion("0.6.0-dev", "", "")
+			return nil
+		},
+	}
+
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(packCmd)
 	rootCmd.AddCommand(publishCmd)
@@ -774,12 +924,24 @@ func init() {
 	rootCmd.AddCommand(signCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(benchmarkCmd)
+	rootCmd.AddCommand(versionCmd)
 }
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		// Use improved error formatting
-		fmt.Fprint(os.Stderr, errors.FormatError(err))
+		// Enhanced error handling with recovery suggestions
+		if bagboyErr, ok := err.(*errors.BagboyError); ok {
+			ui.Error(bagboyErr.Message)
+			if len(bagboyErr.Suggestions) > 0 {
+				ui.Info("💡 " + bagboyErr.Suggestions[0])
+			}
+			if bagboyErr.Details != "" {
+				ui.Info("📋 " + bagboyErr.Details)
+			}
+		} else {
+			ui.Error(err.Error())
+			ui.Info("💡 Run 'bagboy --help' for usage information")
+		}
 		os.Exit(1)
 	}
 }
