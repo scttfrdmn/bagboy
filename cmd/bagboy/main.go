@@ -49,6 +49,7 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/packager/rpm"
 	"github.com/scttfrdmn/bagboy/pkg/packager/scoop"
 	"github.com/scttfrdmn/bagboy/pkg/packager/snap"
+	"github.com/scttfrdmn/bagboy/pkg/packager/spack"
 	"github.com/scttfrdmn/bagboy/pkg/packager/winget"
 	"gopkg.in/yaml.v3"
 )
@@ -161,6 +162,7 @@ var packCmd = &cobra.Command{
 		msixFlag, _ := cmd.Flags().GetBool("msix")
 		cargoFlag, _ := cmd.Flags().GetBool("cargo")
 		nixFlag, _ := cmd.Flags().GetBool("nix")
+		spackFlag, _ := cmd.Flags().GetBool("spack")
 		installerFlag, _ := cmd.Flags().GetBool("installer")
 
 		configPath, err := config.FindConfigFile()
@@ -196,6 +198,7 @@ var packCmd = &cobra.Command{
 		registry.Register(msix.New())
 		registry.Register(cargo.New())
 		registry.Register(nix.New())
+		registry.Register(spack.New())
 		registry.Register(installer.New())
 
 		ctx := context.Background()
@@ -427,6 +430,16 @@ var packCmd = &cobra.Command{
 			}
 		}
 
+		if spackFlag {
+			if p, ok := registry.Get("spack"); ok {
+				output, err := p.Pack(ctx, cfg)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("✅ Created spack package: %s\n", output)
+			}
+		}
+
 		if installerFlag {
 			if p, ok := registry.Get("installer"); ok {
 				output, err := p.Pack(ctx, cfg)
@@ -484,7 +497,7 @@ var publishCmd = &cobra.Command{
 		registry.Register(cargo.New())
 		registry.Register(nix.New())
 		registry.Register(installer.New())
-
+		registry.Register(spack.New())
 		ctx := context.Background()
 		results, err := registry.PackAll(ctx, cfg)
 		if err != nil {
@@ -706,6 +719,7 @@ func init() {
 	packCmd.Flags().Bool("msix", false, "Create Windows MSIX package")
 	packCmd.Flags().Bool("cargo", false, "Create Rust Cargo package")
 	packCmd.Flags().Bool("nix", false, "Create Nix package")
+	packCmd.Flags().Bool("spack", false, "Create Spack package")
 	packCmd.Flags().Bool("installer", false, "Create curl|bash installer")
 
 	publishCmd.Flags().Bool("dry-run", false, "Show what would be done without executing")
