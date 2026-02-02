@@ -32,6 +32,7 @@ import (
 	initpkg "github.com/scttfrdmn/bagboy/pkg/init"
 	"github.com/scttfrdmn/bagboy/pkg/packager"
 	"github.com/scttfrdmn/bagboy/pkg/packager/appimage"
+	"github.com/scttfrdmn/bagboy/pkg/packager/apptainer"
 	"github.com/scttfrdmn/bagboy/pkg/packager/brew"
 	"github.com/scttfrdmn/bagboy/pkg/packager/cargo"
 	"github.com/scttfrdmn/bagboy/pkg/packager/chocolatey"
@@ -154,6 +155,7 @@ var packCmd = &cobra.Command{
 		npmFlag, _ := cmd.Flags().GetBool("npm")
 		pypiFlag, _ := cmd.Flags().GetBool("pypi")
 		dockerFlag, _ := cmd.Flags().GetBool("docker")
+		apptainerFlag, _ := cmd.Flags().GetBool("apptainer")
 		dmgFlag, _ := cmd.Flags().GetBool("dmg")
 		msiFlag, _ := cmd.Flags().GetBool("msi")
 		msixFlag, _ := cmd.Flags().GetBool("msix")
@@ -188,6 +190,7 @@ var packCmd = &cobra.Command{
 		registry.Register(npm.New())
 		registry.Register(pypi.New())
 		registry.Register(docker.New())
+		registry.Register(apptainer.New())
 		registry.Register(dmg.New())
 		registry.Register(msi.New())
 		registry.Register(msix.New())
@@ -364,6 +367,16 @@ var packCmd = &cobra.Command{
 			}
 		}
 
+		if apptainerFlag {
+			if p, ok := registry.Get("apptainer"); ok {
+				output, err := p.Pack(ctx, cfg)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("✅ Created apptainer container: %s\n", output)
+			}
+		}
+
 		if dmgFlag {
 			if p, ok := registry.Get("dmg"); ok {
 				output, err := p.Pack(ctx, cfg)
@@ -464,6 +477,7 @@ var publishCmd = &cobra.Command{
 		registry.Register(npm.New())
 		registry.Register(pypi.New())
 		registry.Register(docker.New())
+		registry.Register(apptainer.New())
 		registry.Register(dmg.New())
 		registry.Register(msi.New())
 		registry.Register(msix.New())
@@ -686,6 +700,7 @@ func init() {
 	packCmd.Flags().Bool("npm", false, "Create npm package")
 	packCmd.Flags().Bool("pypi", false, "Create PyPI package")
 	packCmd.Flags().Bool("docker", false, "Create Docker files")
+	packCmd.Flags().Bool("apptainer", false, "Create Apptainer container")
 	packCmd.Flags().Bool("dmg", false, "Create macOS DMG installer")
 	packCmd.Flags().Bool("msi", false, "Create Windows MSI installer")
 	packCmd.Flags().Bool("msix", false, "Create Windows MSIX package")
