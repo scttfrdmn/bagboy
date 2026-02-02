@@ -22,6 +22,13 @@ func TestDEBPackager(t *testing.T) {
 		Version:     "1.0.0",
 		Description: "Test application",
 		Author:      "Test Author <test@example.com>",
+		Packages: config.PackagesConfig{
+			Deb: config.DebConfig{
+				Maintainer: "test@example.com",
+				Section:    "utils",
+				Priority:   "optional",
+			},
+		},
 		Binaries: map[string]string{
 			"linux-amd64": testBinary,
 		},
