@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/scttfrdmn/bagboy/pkg/benchmark"
 	"github.com/scttfrdmn/bagboy/pkg/config"
 	"github.com/scttfrdmn/bagboy/pkg/deploy"
 	"github.com/scttfrdmn/bagboy/pkg/requirements"
@@ -732,6 +733,30 @@ func init() {
 	signCmd.Flags().Bool("check", false, "Check signing setup only")
 	signCmd.Flags().String("binary", "", "Path to binary to sign")
 
+	var benchmarkCmd = &cobra.Command{
+		Use:   "benchmark",
+		Short: "Run performance benchmarks",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := config.FindConfigFile()
+			if err != nil {
+				return err
+			}
+
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println("🚀 Running bagboy performance benchmarks...")
+			
+			// Run basic benchmark suite
+			results := benchmark.RunBenchmarkSuite(cfg)
+			benchmark.PrintBenchmarkResults(results)
+			
+			return nil
+		},
+	}
+
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(packCmd)
 	rootCmd.AddCommand(publishCmd)
@@ -739,6 +764,7 @@ func init() {
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(signCmd)
 	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(benchmarkCmd)
 }
 
 func main() {
