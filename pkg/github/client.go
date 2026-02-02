@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/scttfrdmn/bagboy/pkg/config"
@@ -72,15 +73,118 @@ func (c *Client) uploadAsset(ctx context.Context, cfg *config.Config, releaseID 
 }
 
 func (c *Client) UpdateTap(ctx context.Context, cfg *config.Config, formula string) error {
-	// This would implement tap management
-	// For now, just a placeholder
-	fmt.Printf("Would update tap %s with formula\n", cfg.GitHub.Tap.Repo)
+	if !cfg.GitHub.Tap.Enabled {
+		return nil
+	}
+
+	tapRepo := cfg.GitHub.Tap.Repo
+	if tapRepo == "" {
+		tapRepo = fmt.Sprintf("%s/homebrew-tap", cfg.GitHub.Owner)
+	}
+
+	parts := strings.Split(tapRepo, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid tap repo format: %s", tapRepo)
+	}
+	tapOwner, tapRepoName := parts[0], parts[1]
+
+	// Create repository if it doesn't exist and auto_create is enabled
+	if cfg.GitHub.Tap.AutoCreate {
+		if err := c.ensureRepository(ctx, tapOwner, tapRepoName, "Homebrew tap for "+cfg.Name); err != nil {
+			return fmt.Errorf("failed to ensure tap repository: %w", err)
+		}
+	}
+
+	// Update formula file
+	formulaPath := fmt.Sprintf("Formula/%s.rb", cfg.Name)
+	commitMessage := fmt.Sprintf("Update %s to v%s", cfg.Name, cfg.Version)
+	
+	if cfg.GitHub.Tap.AutoCommit {
+		return c.updateFile(ctx, tapOwner, tapRepoName, formulaPath, formula, commitMessage)
+	}
+
+	fmt.Printf("✅ Would update tap %s with formula (auto_commit disabled)\n", tapRepo)
 	return nil
 }
 
 func (c *Client) UpdateBucket(ctx context.Context, cfg *config.Config, manifest string) error {
-	// This would implement bucket management
-	// For now, just a placeholder
-	fmt.Printf("Would update bucket %s with manifest\n", cfg.GitHub.Bucket.Repo)
+	if !cfg.GitHub.Bucket.Enabled {
+		return nil
+	}
+
+	bucketRepo := cfg.GitHub.Bucket.Repo
+	if bucketRepo == "" {
+		bucketRepo = fmt.Sprintf("%s/scoop-bucket", cfg.GitHub.Owner)
+	}
+
+	parts := strings.Split(bucketRepo, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid bucket repo format: %s", bucketRepo)
+	}
+	bucketOwner, bucketRepoName := parts[0], parts[1]
+
+	// Create repository if it doesn't exist and auto_create is enabled
+	if cfg.GitHub.Bucket.AutoCreate {
+		if err := c.ensureRepository(ctx, bucketOwner, bucketRepoName, "Scoop bucket for "+cfg.Name); err != nil {
+			return fmt.Errorf("failed to ensure bucket repository: %w", err)
+		}
+	}
+
+	// Update manifest file
+	manifestPath := fmt.Sprintf("bucket/%s.json", cfg.Name)
+	commitMessage := fmt.Sprintf("Update %s to v%s", cfg.Name, cfg.Version)
+	
+	if cfg.GitHub.Bucket.AutoCommit {
+		return c.updateFile(ctx, bucketOwner, bucketRepoName, manifestPath, manifest, commitMessage)
+	}
+
+	fmt.Printf("✅ Would update bucket %s with manifest (auto_commit disabled)\n", bucketRepo)
+	return nil
+}
+
+func (c *Client) ensureRepository(ctx context.Context, owner, repo, description string) error {
+	// Check if repository exists
+	_, _, err := c.gh.Repositories.Get(ctx, owner, repo)
+	if err == nil {
+		return nil // Repository exists
+	}
+
+	// Create repository
+	repository := &github.Repository{
+		Name:        github.String(repo),
+		Description: github.String(description),
+		Private:     github.Bool(false),
+	}
+
+	_, _, err = c.gh.Repositories.Create(ctx, "", repository)
+	if err != nil {
+		return fmt.Errorf("failed to create repository %s/%s: %w", owner, repo, err)
+	}
+
+	fmt.Printf("✅ Created repository %s/%s\n", owner, repo)
+	return nil
+}
+
+func (c *Client) updateFile(ctx context.Context, owner, repo, path, content, commitMessage string) error {
+	// Get current file (if exists)
+	var currentSHA *string
+	fileContent, _, _, err := c.gh.Repositories.GetContents(ctx, owner, repo, path, nil)
+	if err == nil && fileContent != nil {
+		currentSHA = fileContent.SHA
+	}
+
+	// Update or create file
+	opts := &github.RepositoryContentFileOptions{
+		Message: github.String(commitMessage),
+		Content: []byte(content),
+		SHA:     currentSHA,
+	}
+
+	_, _, err = c.gh.Repositories.CreateFile(ctx, owner, repo, path, opts)
+	if err != nil {
+		return fmt.Errorf("failed to update file %s: %w", path, err)
+	}
+
+	fmt.Printf("✅ Updated %s/%s:%s\n", owner, repo, path)
 	return nil
 }
