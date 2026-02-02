@@ -1,0 +1,82 @@
+name: bagboy
+version: 0.1.0
+description: Universal software packager. Pack once. Ship everywhere.
+homepage: https://bagboy.dev
+license: MIT
+author: Scott Friedman <scott@example.com>
+
+binaries:
+  darwin-amd64: dist/bagboy-darwin-amd64
+  darwin-arm64: dist/bagboy-darwin-arm64
+  linux-amd64: dist/bagboy-linux-amd64
+  linux-arm64: dist/bagboy-linux-arm64
+  windows-amd64: dist/bagboy-windows-amd64.exe
+
+github:
+  owner: scttfrdmn
+  repo: bagboy
+  token_env: GITHUB_TOKEN
+  
+  release:
+    enabled: true
+    draft: false
+    prerelease: false
+    generate_notes: true
+  
+  tap:
+    enabled: true
+    repo: scttfrdmn/homebrew-tap
+    auto_create: true
+    auto_commit: true
+    auto_push: true
+    
+  bucket:
+    enabled: true
+    repo: scttfrdmn/scoop-bucket
+    auto_create: true
+    auto_commit: true
+    auto_push: true
+    
+  winget:
+    enabled: true
+    auto_pr: true
+    fork_repo: scttfrdmn/winget-pkgs
+
+installer:
+  base_url: https://github.com/scttfrdmn/bagboy/releases/download/v{{.Version}}
+  install_path: /usr/local/bin
+  detect_os: true
+  verify_checksum: true
+
+packages:
+  brew:
+    test: |
+      system "#{bin}/bagboy --version"
+    
+  scoop:
+    bin: bagboy.exe
+    
+  chocolatey:
+    package_source_url: https://github.com/scttfrdmn/bagboy
+    docs_url: https://bagboy.dev/docs
+    
+  winget:
+    package_identifier: ScottFriedman.Bagboy
+    publisher: Scott Friedman
+    minimum_os_version: 10.0.0.0
+    
+  deb:
+    maintainer: scott@example.com
+    section: utils
+    priority: optional
+    
+  rpm:
+    group: Applications/System
+    vendor: Scott Friedman
+    
+  appimage:
+    categories: [Utility, Development]
+    icon: assets/icon.png
+    desktop_entry:
+      terminal: false
+      type: Application

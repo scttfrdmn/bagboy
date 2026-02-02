@@ -1,0 +1,32 @@
+# Coverage files
+coverage.out
+coverage.html
+
+# Build artifacts
+bin/
+dist/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.test
+*.prof
+
+# Temporary files
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# Local config overrides
+bagboy.local.yaml
+.env.local
