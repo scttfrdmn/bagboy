@@ -1,8 +1,16 @@
 # bagboy - Universal Software Packager
 
+<div align="center">
+  <img src=".github/images/bagboy-head.png" alt="bagboy - Universal Software Packager" width="600">
+</div>
+
 Pack once. Ship everywhere. 
 
 bagboy is a simple, fast, and comprehensive software packaging tool that generates packages for all major platforms from a single configuration file.
+
+<div align="center">
+  <img src=".github/images/bagboy-pack.png" alt="bagboy packaging workflow" width="800">
+</div>
 
 ## 🚀 Quick Start
 
