@@ -1072,9 +1072,63 @@ Examples:
 		},
 	}
 
+	var depsResolveCmd = &cobra.Command{
+		Use:   "resolve",
+		Short: "Resolve dependency conflicts",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := config.FindConfigFile()
+			if err != nil {
+				return err
+			}
+
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+
+			manager := deps.NewManager(cfg)
+			ctx := context.Background()
+			
+			ui.Header("Resolving Dependencies")
+			
+			result, err := manager.Resolve(ctx)
+			if err != nil {
+				return err
+			}
+			
+			if len(result.Conflicts) > 0 {
+				ui.Warning(fmt.Sprintf("Found %d dependency conflicts", len(result.Conflicts)))
+				
+				table := ui.NewTable([]string{"Dependency", "Conflicting Versions", "Reason"})
+				for _, conflict := range result.Conflicts {
+					table.AddRow([]string{
+						conflict.Dependency,
+						strings.Join(conflict.Versions, ", "),
+						conflict.Reason,
+					})
+				}
+				table.Print()
+			} else {
+				ui.Success("No dependency conflicts found")
+			}
+			
+			ui.Info(fmt.Sprintf("Resolved %d dependencies", len(result.Resolved)))
+			
+			// Generate lock file
+			if err := manager.WriteLockFile(ctx, "bagboy.lock"); err != nil {
+				ui.Warning(fmt.Sprintf("Failed to write lock file: %v", err))
+			} else {
+				ui.Success("Generated bagboy.lock file")
+			}
+			
+			return nil
+		},
+	}
+
 	depsCmd.AddCommand(depsCheckCmd)
 	depsCmd.AddCommand(depsListCmd)
 	depsCmd.AddCommand(depsInstallCmd)
+	depsCmd.AddCommand(depsResolveCmd)
 
 	var versionCmd = &cobra.Command{
 		Use:     "version",

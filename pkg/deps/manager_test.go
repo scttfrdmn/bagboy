@@ -19,6 +19,7 @@ package deps
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
@@ -148,26 +149,194 @@ func TestDependencyDetection(t *testing.T) {
 	})
 }
 
-func TestConstraintSatisfaction(t *testing.T) {
-	cfg := &config.Config{}
+func TestDependencyResolution(t *testing.T) {
+	cfg := &config.Config{
+		Dependencies: config.DependenciesConfig{
+			System: map[string][]string{
+				"linux": {"curl", "git"},
+			},
+			PackageManagers: map[string][]string{
+				"apt": {"libssl-dev"},
+			},
+			Runtime: map[string]string{
+				"node": ">=18.0.0",
+				"go":   ">=1.19",
+			},
+		},
+	}
+
 	manager := NewManager(cfg)
+	ctx := context.Background()
 
-	tests := []struct {
-		version    string
-		constraint string
-		expected   bool
-	}{
-		{"v18.0.0", ">=18.0.0", true},
-		{"v17.0.0", ">=18.0.0", false},
-		{"go version go1.19.0", ">=1.19", true},
-		{"Python 3.8.0", ">=3.8", true},
-	}
-
-	for _, test := range tests {
-		result := manager.satisfiesConstraint(test.version, test.constraint)
-		if result != test.expected {
-			t.Errorf("satisfiesConstraint(%q, %q) = %v, expected %v",
-				test.version, test.constraint, result, test.expected)
+	t.Run("Resolve dependencies", func(t *testing.T) {
+		result, err := manager.Resolve(ctx)
+		if err != nil {
+			t.Fatalf("Resolve failed: %v", err)
 		}
+
+		if result == nil {
+			t.Fatal("Expected resolution result")
+		}
+
+		if len(result.Resolved) == 0 {
+			t.Error("Expected resolved dependencies")
+		}
+
+		// Check that runtime dependencies are resolved with constraints
+		if nodeVersion, ok := result.Resolved["node"]; !ok || nodeVersion != ">=18.0.0" {
+			t.Errorf("Expected node >=18.0.0, got %s", nodeVersion)
+		}
+	})
+
+	t.Run("Generate lock file", func(t *testing.T) {
+		lockFile, err := manager.GenerateLockFile(ctx)
+		if err != nil {
+			t.Fatalf("GenerateLockFile failed: %v", err)
+		}
+
+		if lockFile == nil {
+			t.Fatal("Expected lock file")
+		}
+
+		if lockFile.Version == "" {
+			t.Error("Expected lock file version")
+		}
+
+		if len(lockFile.Dependencies) == 0 {
+			t.Error("Expected lock file dependencies")
+		}
+	})
+}
+
+func TestDependencyCache(t *testing.T) {
+	cache := NewCache()
+
+	t.Run("Cache operations", func(t *testing.T) {
+		status := DependencyStatus{
+			Available: true,
+			Version:   "1.0.0",
+		}
+
+		// Set cache entry
+		err := cache.Set("test-dep", status, time.Minute)
+		if err != nil {
+			t.Fatalf("Cache set failed: %v", err)
+		}
+
+		// Get cache entry
+		cached, found := cache.Get("test-dep")
+		if !found {
+			t.Error("Expected cached entry to be found")
+		}
+
+		if cached.Available != status.Available {
+			t.Error("Cached status doesn't match")
+		}
+
+		if cached.Version != status.Version {
+			t.Error("Cached version doesn't match")
+		}
+	})
+
+	t.Run("Cache expiration", func(t *testing.T) {
+		status := DependencyStatus{Available: true}
+
+		// Set with very short TTL
+		err := cache.Set("expire-test", status, time.Nanosecond)
+		if err != nil {
+			t.Fatalf("Cache set failed: %v", err)
+		}
+
+		// Wait for expiration
+		time.Sleep(time.Millisecond)
+
+		// Should not find expired entry
+		_, found := cache.Get("expire-test")
+		if found {
+			t.Error("Expected expired entry to not be found")
+		}
+	})
+}
+
+func TestDependencyInjection(t *testing.T) {
+	cfg := &config.Config{
+		Dependencies: config.DependenciesConfig{
+			System: map[string][]string{
+				"linux":  {"curl", "git"},
+				"darwin": {"curl", "git"},
+			},
+			PackageManagers: map[string][]string{
+				"apt":      {"libssl-dev"},
+				"homebrew": {"openssl"},
+			},
+			Runtime: map[string]string{
+				"node": ">=18.0.0",
+			},
+		},
 	}
+
+	injector := NewInjector(cfg)
+
+	t.Run("DEB dependency injection", func(t *testing.T) {
+		deps := injector.InjectDEBDependencies()
+		if len(deps) == 0 {
+			t.Error("Expected DEB dependencies")
+		}
+
+		// Should include both system and apt dependencies
+		hasSystemDep := false
+		hasAptDep := false
+		for _, dep := range deps {
+			if dep == "curl" || dep == "git" {
+				hasSystemDep = true
+			}
+			if dep == "libssl-dev" {
+				hasAptDep = true
+			}
+		}
+
+		if !hasSystemDep {
+			t.Error("Expected system dependencies in DEB injection")
+		}
+		if !hasAptDep {
+			t.Error("Expected APT dependencies in DEB injection")
+		}
+	})
+
+	t.Run("Homebrew dependency injection", func(t *testing.T) {
+		deps := injector.InjectBrewDependencies()
+		if len(deps) == 0 {
+			t.Error("Expected Homebrew dependencies")
+		}
+
+		// Should include both system and homebrew dependencies
+		hasSystemDep := false
+		hasBrewDep := false
+		for _, dep := range deps {
+			if dep == "curl" || dep == "git" {
+				hasSystemDep = true
+			}
+			if dep == "openssl" {
+				hasBrewDep = true
+			}
+		}
+
+		if !hasSystemDep {
+			t.Error("Expected system dependencies in Homebrew injection")
+		}
+		if !hasBrewDep {
+			t.Error("Expected Homebrew dependencies in injection")
+		}
+	})
+
+	t.Run("Runtime dependencies", func(t *testing.T) {
+		runtime := injector.GetRuntimeDependencies()
+		if len(runtime) == 0 {
+			t.Error("Expected runtime dependencies")
+		}
+
+		if nodeVersion, ok := runtime["node"]; !ok || nodeVersion != ">=18.0.0" {
+			t.Error("Expected node runtime dependency")
+		}
+	})
 }

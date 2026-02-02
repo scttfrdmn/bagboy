@@ -19,21 +19,28 @@ package deps
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
+	"gopkg.in/yaml.v3"
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
 // Manager handles dependency resolution and installation
 type Manager struct {
 	config *config.Config
+	cache  *Cache
 }
 
 // NewManager creates a new dependency manager
 func NewManager(cfg *config.Config) *Manager {
-	return &Manager{config: cfg}
+	return &Manager{
+		config: cfg,
+		cache:  NewCache(),
+	}
 }
 
 // Check verifies all dependencies are available
@@ -122,19 +129,172 @@ func (m *Manager) List() []Dependency {
 // Resolve handles dependency conflicts and version constraints
 func (m *Manager) Resolve(ctx context.Context) (*ResolutionResult, error) {
 	result := &ResolutionResult{
-		Resolved: make(map[string]string),
+		Resolved:  make(map[string]string),
 		Conflicts: make([]Conflict, 0),
 	}
 	
-	// Simple resolution - just check current platform
+	// Collect all dependencies with their constraints
+	depMap := make(map[string][]string)
+	
+	// System dependencies (current platform only)
 	platform := runtime.GOOS
 	if deps, ok := m.config.Dependencies.System[platform]; ok {
 		for _, dep := range deps {
-			result.Resolved[dep] = "latest"
+			depMap[dep] = append(depMap[dep], "system")
+		}
+	}
+	
+	// Package manager dependencies (current platform)
+	pm := m.detectPackageManager()
+	if deps, ok := m.config.Dependencies.PackageManagers[pm]; ok {
+		for _, dep := range deps {
+			depMap[dep] = append(depMap[dep], pm)
+		}
+	}
+	
+	// Runtime dependencies with version constraints
+	for runtime, version := range m.config.Dependencies.Runtime {
+		if existing, exists := depMap[runtime]; exists {
+			// Check for version conflicts
+			for _, existingSource := range existing {
+				if existingSource != version {
+					result.Conflicts = append(result.Conflicts, Conflict{
+						Dependency: runtime,
+						Versions:   []string{existingSource, version},
+						Reason:     "Version constraint mismatch",
+					})
+				}
+			}
+		}
+		depMap[runtime] = append(depMap[runtime], version)
+		result.Resolved[runtime] = version
+	}
+	
+	// Resolve system and package manager dependencies
+	for dep, sources := range depMap {
+		if len(sources) > 1 {
+			// Multiple sources - check for conflicts
+			unique := make(map[string]bool)
+			for _, source := range sources {
+				unique[source] = true
+			}
+			if len(unique) > 1 {
+				var versions []string
+				for version := range unique {
+					versions = append(versions, version)
+				}
+				result.Conflicts = append(result.Conflicts, Conflict{
+					Dependency: dep,
+					Versions:   versions,
+					Reason:     "Multiple sources with different requirements",
+				})
+			}
+		}
+		
+		// Use the first source as resolved version
+		if len(sources) > 0 {
+			result.Resolved[dep] = sources[0]
 		}
 	}
 	
 	return result, nil
+}
+
+// GenerateLockFile creates a lock file with resolved dependencies
+func (m *Manager) GenerateLockFile(ctx context.Context) (*LockFile, error) {
+	resolution, err := m.Resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	lockFile := &LockFile{
+		Version:      "1.0",
+		Generated:    time.Now().UTC(),
+		Dependencies: make(map[string]LockEntry),
+	}
+	
+	// Check current versions of resolved dependencies
+	for dep, constraint := range resolution.Resolved {
+		status := m.checkAnyDependency(dep)
+		
+		entry := LockEntry{
+			Version:    status.Version,
+			Constraint: constraint,
+			Source:     m.getDepSource(dep),
+			Resolved:   time.Now().UTC(),
+		}
+		
+		if !status.Available {
+			entry.Version = "not-installed"
+		}
+		
+		lockFile.Dependencies[dep] = entry
+	}
+	
+	return lockFile, nil
+}
+
+// WriteLockFile writes the lock file to disk
+func (m *Manager) WriteLockFile(ctx context.Context, path string) error {
+	lockFile, err := m.GenerateLockFile(ctx)
+	if err != nil {
+		return err
+	}
+	
+	data, err := yaml.Marshal(lockFile)
+	if err != nil {
+		return err
+	}
+	
+	return os.WriteFile(path, data, 0644)
+}
+
+func (m *Manager) checkAnyDependency(dep string) DependencyStatus {
+	// Try system dependency first
+	if m.commandExists(dep) {
+		return DependencyStatus{Available: true, Version: "system"}
+	}
+	
+	// Try package manager
+	pm := m.detectPackageManager()
+	status := m.checkPackageManagerDependency(pm, dep)
+	if status.Available {
+		return status
+	}
+	
+	// Try runtime dependency
+	if version, ok := m.config.Dependencies.Runtime[dep]; ok {
+		return m.checkRuntimeDependency(dep, version)
+	}
+	
+	return DependencyStatus{Available: false}
+}
+
+func (m *Manager) getDepSource(dep string) string {
+	// Check which source this dependency comes from
+	platform := runtime.GOOS
+	if deps, ok := m.config.Dependencies.System[platform]; ok {
+		for _, sysDep := range deps {
+			if sysDep == dep {
+				return "system"
+			}
+		}
+	}
+	
+	pm := m.detectPackageManager()
+	if deps, ok := m.config.Dependencies.PackageManagers[pm]; ok {
+		for _, pmDep := range deps {
+			if pmDep == dep {
+				return pm
+			}
+		}
+	}
+	
+	if _, ok := m.config.Dependencies.Runtime[dep]; ok {
+		return "runtime"
+	}
+	
+	return "unknown"
 }
 
 func (m *Manager) detectPackageManager() string {
@@ -170,14 +330,24 @@ func (m *Manager) commandExists(cmd string) bool {
 }
 
 func (m *Manager) checkSystemDependency(dep string) DependencyStatus {
+	// Check cache first
+	cacheKey := fmt.Sprintf("system_%s_%s", runtime.GOOS, dep)
+	if cached, found := m.cache.Get(cacheKey); found {
+		return *cached
+	}
+	
 	// Simple check - see if command exists
+	status := DependencyStatus{Available: false}
 	if m.commandExists(dep) {
-		return DependencyStatus{
+		status = DependencyStatus{
 			Available: true,
-			Version:   "unknown",
+			Version:   "system",
 		}
 	}
-	return DependencyStatus{Available: false}
+	
+	// Cache result for 5 minutes
+	m.cache.Set(cacheKey, status, 5*time.Minute)
+	return status
 }
 
 func (m *Manager) checkPackageManagerDependency(pm, dep string) DependencyStatus {
@@ -308,4 +478,19 @@ type Conflict struct {
 	Dependency string   `json:"dependency"`
 	Versions   []string `json:"versions"`
 	Reason     string   `json:"reason"`
+}
+
+// LockFile represents a dependency lock file
+type LockFile struct {
+	Version      string               `yaml:"version"`
+	Generated    time.Time            `yaml:"generated"`
+	Dependencies map[string]LockEntry `yaml:"dependencies"`
+}
+
+// LockEntry represents a locked dependency
+type LockEntry struct {
+	Version    string    `yaml:"version"`
+	Constraint string    `yaml:"constraint,omitempty"`
+	Source     string    `yaml:"source"`
+	Resolved   time.Time `yaml:"resolved"`
 }
