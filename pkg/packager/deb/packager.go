@@ -256,9 +256,10 @@ func (p *Packager) addFileToAr(arWriter *ar.Writer, filePath, name string) error
 	}
 
 	header := &ar.Header{
-		Name: name,
-		Size: info.Size(),
-		Mode: int64(info.Mode()),
+		Name:    name,
+		Size:    info.Size(),
+		Mode:    int64(info.Mode()),
+		ModTime: info.ModTime(),
 	}
 
 	if err := arWriter.WriteHeader(header); err != nil {
