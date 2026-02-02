@@ -27,7 +27,7 @@ bagboy publish
 
 ## ✨ Features
 
-- **Universal**: Supports 19 package formats including Homebrew, Scoop, DEB, RPM, AppImage, MSI, Chocolatey, Winget, Docker, Apptainer
+- **Universal**: Supports 20 package formats including Homebrew, Scoop, DEB, RPM, AppImage, MSI, Chocolatey, Winget, Docker, Apptainer, Spack
 - **Simple**: One YAML config file, minimal setup
 - **Fast**: Written in Go, parallel packaging
 - **GitHub Integration**: Automatic releases, tap/bucket management, Winget PRs
