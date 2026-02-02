@@ -285,6 +285,160 @@ func TestCopyFile(t *testing.T) {
 	}
 }
 
+func TestCopyFile_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with non-existent source file
+	err := packager.copyFile("/non/existent/file", "/tmp/dest")
+	if err == nil {
+		t.Error("copyFile() should fail with non-existent source file")
+	}
+}
+
+func TestBuildAppImage_NoTools(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	appDir := filepath.Join(tmpDir, "test.AppDir")
+	os.MkdirAll(appDir, 0755)
+	
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+	}
+
+	ctx := context.Background()
+	_, err := packager.buildAppImage(ctx, appDir, cfg)
+	
+	// Should return error about missing tools
+	if err == nil {
+		t.Error("buildAppImage() should fail when no AppImage build tools are available")
+	}
+	
+	if !contains(err.Error(), "neither appimagetool nor mksquashfs found") {
+		t.Errorf("Expected 'neither appimagetool nor mksquashfs found' error, got: %v", err)
+	}
+}
+
+func TestBuildWithAppimagetool(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	appDir := filepath.Join(tmpDir, "test.AppDir")
+	os.MkdirAll(appDir, 0755)
+	outputPath := filepath.Join(tmpDir, "test.AppImage")
+	
+	ctx := context.Background()
+	_, err := packager.buildWithAppimagetool(ctx, appDir, outputPath)
+	
+	// This will fail because appimagetool is not available, but we test the code path
+	if err == nil {
+		t.Error("buildWithAppimagetool() should fail when appimagetool is not available")
+	}
+}
+
+func TestBuildWithSquashfs(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	appDir := filepath.Join(tmpDir, "test.AppDir")
+	os.MkdirAll(appDir, 0755)
+	outputPath := filepath.Join(tmpDir, "test.AppImage")
+	
+	ctx := context.Background()
+	_, err := packager.buildWithSquashfs(ctx, appDir, outputPath)
+	
+	// This will fail because mksquashfs is not available, but we test the code path
+	if err == nil {
+		t.Error("buildWithSquashfs() should fail when mksquashfs is not available")
+	}
+}
+
+func TestCreateAppImageFromSquashfs(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	squashfsPath := filepath.Join(tmpDir, "test.squashfs")
+	outputPath := filepath.Join(tmpDir, "test.AppImage")
+	
+	// Create a dummy squashfs file
+	os.WriteFile(squashfsPath, []byte("fake squashfs content"), 0644)
+	
+	err := packager.createAppImageFromSquashfs(squashfsPath, outputPath)
+	if err != nil {
+		t.Errorf("createAppImageFromSquashfs() error = %v", err)
+	}
+	
+	// Check output file was created
+	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+		t.Error("AppImage file was not created")
+	}
+	
+	// Check file is executable
+	info, err := os.Stat(outputPath)
+	if err != nil {
+		t.Errorf("Failed to stat AppImage: %v", err)
+	}
+	if info.Mode().Perm()&0111 == 0 {
+		t.Error("AppImage is not executable")
+	}
+}
+
+func TestCreateAppRun_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with invalid path
+	err := packager.createAppRun("/non/existent/dir/AppRun", &config.Config{})
+	if err == nil {
+		t.Error("createAppRun() should fail with invalid path")
+	}
+}
+
+func TestCreateDesktopFile_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with invalid path
+	err := packager.createDesktopFile("/non/existent/dir/test.desktop", &config.Config{})
+	if err == nil {
+		t.Error("createDesktopFile() should fail with invalid path")
+	}
+}
+
+func TestCreateAppDirStructure_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with invalid binary path
+	err := packager.createAppDirStructure("/tmp/test.AppDir", &config.Config{Name: "test"}, "/non/existent/binary")
+	if err == nil {
+		t.Error("createAppDirStructure() should fail with non-existent binary")
+	}
+}
+
+func TestAppImagePack_MissingBinary(t *testing.T) {
+	packager := New()
+	
+	cfg := &config.Config{
+		Name:        "testapp",
+		Version:     "1.0.0",
+		Description: "Test application",
+		Binaries: map[string]string{
+			"linux-amd64": "/non/existent/binary",
+		},
+		Packages: config.PackagesConfig{
+			AppImage: config.AppImageConfig{
+				Categories: []string{"Utility"},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	_, err := packager.Pack(ctx, cfg)
+	
+	if err == nil {
+		t.Error("Pack() should fail with missing binary file")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 

@@ -295,6 +295,151 @@ func TestCopyFile(t *testing.T) {
 	}
 }
 
+func TestCopyFile_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with non-existent source file
+	err := packager.copyFile("/non/existent/file", "/tmp/dest")
+	if err == nil {
+		t.Error("copyFile() should fail with non-existent source file")
+	}
+}
+
+func TestBuildWithChoco(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	buildDir := filepath.Join(tmpDir, "build")
+	os.MkdirAll(buildDir, 0755)
+	outputPath := filepath.Join(tmpDir, "test.nupkg")
+	
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+	}
+
+	// Create a dummy nuspec file
+	nuspecPath := filepath.Join(buildDir, "testapp.nuspec")
+	os.WriteFile(nuspecPath, []byte("<?xml version=\"1.0\"?><package></package>"), 0644)
+
+	ctx := context.Background()
+	_, err := packager.buildWithChoco(ctx, buildDir, outputPath, cfg)
+	
+	// This will fail because choco is not available, but we test the code path
+	if err == nil {
+		t.Error("buildWithChoco() should fail when choco is not available")
+	}
+}
+
+func TestBuildWithNuget(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	buildDir := filepath.Join(tmpDir, "build")
+	os.MkdirAll(buildDir, 0755)
+	outputPath := filepath.Join(tmpDir, "test.nupkg")
+	
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+	}
+
+	// Create a dummy nuspec file
+	nuspecPath := filepath.Join(buildDir, "testapp.nuspec")
+	os.WriteFile(nuspecPath, []byte("<?xml version=\"1.0\"?><package></package>"), 0644)
+
+	ctx := context.Background()
+	_, err := packager.buildWithNuget(ctx, buildDir, outputPath, cfg)
+	
+	// This will fail because nuget is not available, but we test the code path
+	if err == nil {
+		t.Error("buildWithNuget() should fail when nuget is not available")
+	}
+}
+
+func TestBuildPackage_NoTools(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	buildDir := filepath.Join(tmpDir, "build")
+	os.MkdirAll(buildDir, 0755)
+	
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+	}
+
+	ctx := context.Background()
+	_, err := packager.buildPackage(ctx, buildDir, cfg)
+	
+	// Should return error about missing tools or zip failure
+	if err == nil {
+		t.Error("buildPackage() should fail when no Chocolatey build tools are available")
+	}
+	
+	// Accept either missing tools error or zip failure
+	if !contains(err.Error(), "Chocolatey build tools not found") && !contains(err.Error(), "zip failed") {
+		t.Errorf("Expected 'Chocolatey build tools not found' or 'zip failed' error, got: %v", err)
+	}
+}
+
+func TestGetAuthorName(t *testing.T) {
+	packager := New()
+	
+	tests := []struct {
+		name     string
+		author   string
+		expected string
+	}{
+		{
+			name:     "author with email",
+			author:   "John Doe <john@example.com>",
+			expected: "John Doe",
+		},
+		{
+			name:     "author without email",
+			author:   "Jane Smith",
+			expected: "Jane Smith",
+		},
+		{
+			name:     "author with extra spaces",
+			author:   "  Bob Wilson  <bob@test.com>",
+			expected: "Bob Wilson",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{Author: tt.author}
+			result := packager.getAuthorName(cfg)
+			if result != tt.expected {
+				t.Errorf("getAuthorName() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestChocolateyPack_MissingBinary(t *testing.T) {
+	packager := New()
+	
+	cfg := &config.Config{
+		Name:        "testapp",
+		Version:     "1.0.0",
+		Description: "Test application",
+		Author:      "Test Author",
+		Binaries: map[string]string{
+			"windows-amd64": "/non/existent/binary.exe",
+		},
+	}
+
+	ctx := context.Background()
+	_, err := packager.Pack(ctx, cfg)
+	
+	if err == nil {
+		t.Error("Pack() should fail with missing binary file")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 

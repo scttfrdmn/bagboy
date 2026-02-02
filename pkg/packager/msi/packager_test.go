@@ -254,6 +254,231 @@ func TestCopyFile(t *testing.T) {
 	}
 }
 
+func TestCopyFile_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with non-existent source file
+	err := packager.copyFile("/non/existent/file", "/tmp/dest")
+	if err == nil {
+		t.Error("copyFile() should fail with non-existent source file")
+	}
+}
+
+func TestCreateBuildScript(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "build.bat")
+	
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+	}
+
+	if err := packager.createBuildScript(scriptPath, cfg); err != nil {
+		t.Errorf("createBuildScript() error = %v", err)
+	}
+
+	// Check file was created
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		t.Error("Build script file was not created")
+	}
+
+	// Check content
+	content, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Errorf("Failed to read build script: %v", err)
+	}
+
+	contentStr := string(content)
+	requiredElements := []string{
+		"@echo off",
+		"candle",
+		"light",
+		"set APP_NAME=testapp",
+		"set VERSION=1.0.0",
+		"WixUIExtension",
+	}
+
+	for _, element := range requiredElements {
+		if !contains(contentStr, element) {
+			t.Errorf("Build script missing required element: %s", element)
+		}
+	}
+}
+
+func TestCreatePowerShellScript(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "build.ps1")
+	
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+	}
+
+	if err := packager.createPowerShellScript(scriptPath, cfg); err != nil {
+		t.Errorf("createPowerShellScript() error = %v", err)
+	}
+
+	// Check file was created
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		t.Error("PowerShell script file was not created")
+	}
+
+	// Check content
+	content, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Errorf("Failed to read PowerShell script: %v", err)
+	}
+
+	contentStr := string(content)
+	requiredElements := []string{
+		"$AppName = \"testapp\"",
+		"$Version = \"1.0.0\"",
+		"Write-Host",
+		"candle",
+		"light",
+		"WixUIExtension",
+	}
+
+	for _, element := range requiredElements {
+		if !contains(contentStr, element) {
+			t.Errorf("PowerShell script missing required element: %s", element)
+		}
+	}
+}
+
+func TestBuildMSI_NoTools(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	wxsPath := filepath.Join(tmpDir, "test.wxs")
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+	}
+
+	// Create a dummy WXS file
+	os.WriteFile(wxsPath, []byte("<?xml version=\"1.0\"?><Wix></Wix>"), 0644)
+
+	// Change to temp directory
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	ctx := context.Background()
+	_, err := packager.buildMSI(ctx, tmpDir, wxsPath, cfg)
+	
+	// Should return error about missing tools
+	if err == nil {
+		t.Error("buildMSI() should fail when no MSI build tools are available")
+	}
+	
+	if !contains(err.Error(), "MSI build tools not found") {
+		t.Errorf("Expected 'MSI build tools not found' error, got: %v", err)
+	}
+}
+
+func TestBuildWithWix_MockCommand(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	wxsPath := filepath.Join(tmpDir, "test.wxs")
+	outputPath := filepath.Join(tmpDir, "test.msi")
+
+	ctx := context.Background()
+	err := packager.buildWithWix(ctx, tmpDir, wxsPath, outputPath)
+	
+	// This will fail because candle/light are not available, but we test the code path
+	if err == nil {
+		t.Error("buildWithWix() should fail when WiX tools are not available")
+	}
+	
+	if !contains(err.Error(), "not found") {
+		t.Errorf("Expected 'not found' error for missing WiX tools, got: %v", err)
+	}
+}
+
+func TestBuildWithGoMSI_MockCommand(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	outputPath := filepath.Join(tmpDir, "test.msi")
+	cfg := &config.Config{
+		Name:        "testapp",
+		Version:     "1.0.0",
+		Description: "Test app",
+		Author:      "Test Author",
+	}
+
+	ctx := context.Background()
+	_, err := packager.buildWithGoMSI(ctx, tmpDir, cfg, outputPath)
+	
+	// This will fail because go-msi is not available, but we test the code path
+	if err == nil {
+		t.Error("buildWithGoMSI() should fail when go-msi is not available")
+	}
+	
+	// Should create wix.json config file
+	configPath := filepath.Join(tmpDir, "wix.json")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Error("go-msi config file was not created")
+	}
+}
+
+func TestCreateWixSource_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with invalid path (directory that doesn't exist)
+	err := packager.createWixSource("/non/existent/dir/test.wxs", &config.Config{}, "test.exe")
+	if err == nil {
+		t.Error("createWixSource() should fail with invalid path")
+	}
+}
+
+func TestCreateBuildScript_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with invalid path
+	err := packager.createBuildScript("/non/existent/dir/build.bat", &config.Config{})
+	if err == nil {
+		t.Error("createBuildScript() should fail with invalid path")
+	}
+}
+
+func TestCreatePowerShellScript_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with invalid path
+	err := packager.createPowerShellScript("/non/existent/dir/build.ps1", &config.Config{})
+	if err == nil {
+		t.Error("createPowerShellScript() should fail with invalid path")
+	}
+}
+
+func TestMSIPack_MissingBinary(t *testing.T) {
+	packager := New()
+	
+	cfg := &config.Config{
+		Name:        "testapp",
+		Version:     "1.0.0",
+		Description: "Test application",
+		Author:      "Test Author",
+		Binaries: map[string]string{
+			"windows-amd64": "/non/existent/binary.exe",
+		},
+	}
+
+	ctx := context.Background()
+	_, err := packager.Pack(ctx, cfg)
+	
+	if err == nil {
+		t.Error("Pack() should fail with missing binary file")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 

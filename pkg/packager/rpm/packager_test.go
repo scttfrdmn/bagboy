@@ -188,6 +188,225 @@ func TestCopyFile(t *testing.T) {
 	}
 }
 
+func TestCopyFile_Error(t *testing.T) {
+	packager := New()
+	
+	// Test with non-existent source file
+	err := packager.copyFile("/non/existent/file", "/tmp/dest")
+	if err == nil {
+		t.Error("copyFile() should fail with non-existent source file")
+	}
+}
+
+func TestBuildRPM_NoRpmbuild(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "test.spec")
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+	}
+
+	// Create a dummy spec file
+	os.WriteFile(specPath, []byte("Name: testapp\nVersion: 1.0.0\n"), 0644)
+
+	ctx := context.Background()
+	_, err := packager.buildRPM(ctx, tmpDir, specPath, cfg)
+	
+	// Should return error about missing rpmbuild
+	if err == nil {
+		t.Error("buildRPM() should fail when rpmbuild is not available")
+	}
+	
+	if !contains(err.Error(), "rpmbuild not found") {
+		t.Errorf("Expected 'rpmbuild not found' error, got: %v", err)
+	}
+}
+
+func TestGenerateSpec_WithDefaults(t *testing.T) {
+	packager := New()
+	
+	cfg := &config.Config{
+		Name:        "testapp",
+		Version:     "1.0.0",
+		Description: "Test application",
+		License:     "MIT",
+		Homepage:    "https://example.com",
+		Author:      "Test Author <test@example.com>",
+		Packages: config.PackagesConfig{
+			RPM: config.RPMConfig{
+				Vendor: "Test Vendor",
+				// Group not specified - should use default
+			},
+		},
+	}
+
+	spec := packager.generateSpec(cfg, "/path/to/binary")
+	
+	// Check default group is used
+	if !contains(spec, "Group:          Applications/System") {
+		t.Error("Spec should use default group when not specified")
+	}
+	
+	// Check vendor is included
+	if !contains(spec, "Vendor:         Test Vendor") {
+		t.Error("Spec should include vendor")
+	}
+}
+
+func TestGenerateSpec_EmptyFields(t *testing.T) {
+	packager := New()
+	
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		// Missing description, license, homepage
+		Packages: config.PackagesConfig{
+			RPM: config.RPMConfig{
+				Vendor: "Test Vendor",
+			},
+		},
+	}
+
+	spec := packager.generateSpec(cfg, "/path/to/binary")
+	
+	// Should handle empty fields gracefully
+	if !contains(spec, "Name:           testapp") {
+		t.Error("Spec should contain app name")
+	}
+	
+	if !contains(spec, "Version:        1.0.0") {
+		t.Error("Spec should contain version")
+	}
+}
+
+func TestRPMPack_MissingBinary(t *testing.T) {
+	packager := New()
+	
+	cfg := &config.Config{
+		Name:        "testapp",
+		Version:     "1.0.0",
+		Description: "Test application",
+		Binaries: map[string]string{
+			"linux-amd64": "/non/existent/binary",
+		},
+		Packages: config.PackagesConfig{
+			RPM: config.RPMConfig{
+				Vendor: "Test Vendor",
+			},
+		},
+	}
+
+	ctx := context.Background()
+	_, err := packager.Pack(ctx, cfg)
+	
+	if err == nil {
+		t.Error("Pack() should fail with missing binary file")
+	}
+}
+
+func TestGenerateSpec_BinaryName(t *testing.T) {
+	packager := New()
+	
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		Packages: config.PackagesConfig{
+			RPM: config.RPMConfig{
+				Vendor: "Test Vendor",
+			},
+		},
+	}
+
+	spec := packager.generateSpec(cfg, "/path/to/my-binary")
+	
+	// Check binary name is extracted correctly
+	if !contains(spec, "cp my-binary $RPM_BUILD_ROOT/usr/bin/testapp") {
+		t.Error("Spec should use correct binary name in install section")
+	}
+}
+
+func TestRPMValidate_EmptyVendor(t *testing.T) {
+	packager := New()
+	
+	cfg := &config.Config{
+		Packages: config.PackagesConfig{
+			RPM: config.RPMConfig{
+				Vendor: "",
+			},
+		},
+	}
+
+	err := packager.Validate(cfg)
+	if err == nil {
+		t.Error("Validate() should fail with empty vendor")
+	}
+	
+	if !contains(err.Error(), "vendor is required") {
+		t.Errorf("Expected 'vendor is required' error, got: %v", err)
+	}
+}
+
+func TestRPMPack_FullWorkflow(t *testing.T) {
+	packager := New()
+	
+	tmpDir := t.TempDir()
+	binaryPath := filepath.Join(tmpDir, "testapp")
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho 'test'\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{
+		Name:        "testapp",
+		Version:     "1.0.0",
+		Description: "Test application",
+		License:     "MIT",
+		Homepage:    "https://example.com",
+		Author:      "Test Author <test@example.com>",
+		Binaries: map[string]string{
+			"linux-amd64": binaryPath,
+		},
+		Packages: config.PackagesConfig{
+			RPM: config.RPMConfig{
+				Vendor: "Test Vendor",
+				Group:  "Applications/Development",
+			},
+		},
+	}
+
+	// Change to temp directory
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	ctx := context.Background()
+	_, err := packager.Pack(ctx, cfg)
+	
+	// Should create the build directory structure even if rpmbuild fails
+	buildDir := filepath.Join("dist", "rpm-build")
+	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
+		t.Error("Build directory was not created")
+	}
+	
+	// Should create the spec file
+	specPath := filepath.Join(buildDir, "SPECS", "testapp.spec")
+	if _, err := os.Stat(specPath); os.IsNotExist(err) {
+		t.Error("Spec file was not created")
+	}
+	
+	// Should copy the binary to SOURCES
+	sourcePath := filepath.Join(buildDir, "SOURCES", "testapp")
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		t.Error("Binary was not copied to SOURCES")
+	}
+	
+	// The actual rpmbuild will likely fail, but that's expected
+	if err != nil && !contains(err.Error(), "rpmbuild") {
+		t.Errorf("Unexpected error (expected rpmbuild failure): %v", err)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
