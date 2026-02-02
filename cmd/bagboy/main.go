@@ -27,6 +27,7 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/benchmark"
 	"github.com/scttfrdmn/bagboy/pkg/config"
 	"github.com/scttfrdmn/bagboy/pkg/deploy"
+	"github.com/scttfrdmn/bagboy/pkg/deps"
 	"github.com/scttfrdmn/bagboy/pkg/errors"
 	"github.com/scttfrdmn/bagboy/pkg/requirements"
 	"github.com/scttfrdmn/bagboy/pkg/signing"
@@ -906,12 +907,181 @@ func init() {
 		},
 	}
 
+	var depsCmd = &cobra.Command{
+		Use:   "deps",
+		Short: "Manage dependencies",
+		Long: `Manage project dependencies across platforms and package managers.
+
+Supports system dependencies, package manager dependencies, and runtime requirements.
+Automatically detects the appropriate package manager for your platform.
+
+Examples:
+  bagboy deps check          # Check all dependencies
+  bagboy deps list           # List configured dependencies
+  bagboy deps install        # Install missing dependencies
+  bagboy deps resolve        # Resolve dependency conflicts`,
+	}
+
+	var depsCheckCmd = &cobra.Command{
+		Use:   "check",
+		Short: "Check dependency status",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := config.FindConfigFile()
+			if err != nil {
+				return err
+			}
+
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+
+			manager := deps.NewManager(cfg)
+			ctx := context.Background()
+			
+			ui.Header("Checking Dependencies")
+			
+			results, err := manager.Check(ctx)
+			if err != nil {
+				return err
+			}
+
+			table := ui.NewTable([]string{"Dependency", "Status", "Version"})
+			allAvailable := true
+			
+			for name, status := range results {
+				statusStr := "❌ Missing"
+				if status.Available {
+					if status.Satisfies {
+						statusStr = "✅ Available"
+					} else {
+						statusStr = "⚠️  Wrong Version"
+						allAvailable = false
+					}
+				} else {
+					allAvailable = false
+				}
+				
+				table.AddRow([]string{name, statusStr, status.Version})
+			}
+			
+			table.Print()
+			
+			if allAvailable {
+				ui.Success("All dependencies are satisfied")
+			} else {
+				ui.Warning("Some dependencies are missing or incorrect")
+				ui.Info("Run 'bagboy deps install' to install missing dependencies")
+			}
+			
+			return nil
+		},
+	}
+
+	var depsListCmd = &cobra.Command{
+		Use:   "list",
+		Short: "List configured dependencies",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := config.FindConfigFile()
+			if err != nil {
+				return err
+			}
+
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+
+			manager := deps.NewManager(cfg)
+			dependencies := manager.List()
+			
+			if len(dependencies) == 0 {
+				ui.Info("No dependencies configured")
+				return nil
+			}
+			
+			ui.Header("Configured Dependencies")
+			
+			table := ui.NewTable([]string{"Name", "Type", "Platform/Manager", "Version"})
+			
+			for _, dep := range dependencies {
+				platformOrManager := dep.Platform
+				if dep.PackageManager != "" {
+					platformOrManager = dep.PackageManager
+				}
+				
+				table.AddRow([]string{
+					dep.Name,
+					dep.Type,
+					platformOrManager,
+					dep.Version,
+				})
+			}
+			
+			table.Print()
+			
+			return nil
+		},
+	}
+
+	var depsInstallCmd = &cobra.Command{
+		Use:   "install",
+		Short: "Install missing dependencies",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := config.FindConfigFile()
+			if err != nil {
+				return err
+			}
+
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+
+			manager := deps.NewManager(cfg)
+			ctx := context.Background()
+			
+			ui.Header("Installing Dependencies")
+			
+			// Check which dependencies are missing
+			results, err := manager.Check(ctx)
+			if err != nil {
+				return err
+			}
+			
+			var missing []string
+			for name, status := range results {
+				if !status.Available {
+					missing = append(missing, name)
+				}
+			}
+			
+			if len(missing) == 0 {
+				ui.Success("All dependencies are already installed")
+				return nil
+			}
+			
+			ui.Info(fmt.Sprintf("Installing %d missing dependencies...", len(missing)))
+			
+			if err := manager.Install(ctx, missing); err != nil {
+				return err
+			}
+			
+			ui.Success("Dependencies installed successfully")
+			return nil
+		},
+	}
+
+	depsCmd.AddCommand(depsCheckCmd)
+	depsCmd.AddCommand(depsListCmd)
+	depsCmd.AddCommand(depsInstallCmd)
+
 	var versionCmd = &cobra.Command{
 		Use:     "version",
 		Aliases: []string{"v", "--version"},
 		Short:   "Show version information",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ui.PrintVersion("0.6.0-dev", "", "")
+			ui.PrintVersion("0.7.0-dev", "", "")
 			return nil
 		},
 	}
@@ -924,6 +1094,7 @@ func init() {
 	rootCmd.AddCommand(signCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(benchmarkCmd)
+	rootCmd.AddCommand(depsCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 

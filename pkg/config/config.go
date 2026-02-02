@@ -34,8 +34,9 @@ type Config struct {
 	Binaries    map[string]string `yaml:"binaries"`
 	GitHub      GitHubConfig      `yaml:"github"`
 	Installer   InstallerConfig   `yaml:"installer"`
-	Packages    PackagesConfig    `yaml:"packages"`
-	Signing     SigningConfig     `yaml:"signing"`
+	Packages     PackagesConfig     `yaml:"packages"`
+	Signing      SigningConfig      `yaml:"signing"`
+	Dependencies DependenciesConfig `yaml:"dependencies,omitempty"`
 }
 
 type GitHubConfig struct {
@@ -186,6 +187,13 @@ type SigningConfig struct {
 	Sigstore SigstoreConfig       `yaml:"sigstore"`
 	SignPath SignPathConfig       `yaml:"signpath"`
 	Git      GitSigningConfig     `yaml:"git"`
+}
+
+// DependenciesConfig represents dependency configuration
+type DependenciesConfig struct {
+	System          map[string][]string `yaml:"system,omitempty"`
+	PackageManagers map[string][]string `yaml:"package_managers,omitempty"`
+	Runtime         map[string]string   `yaml:"runtime,omitempty"`
 }
 
 type MacOSSigningConfig struct {
