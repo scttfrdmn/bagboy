@@ -307,7 +307,12 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 📚 Documentation
 
-- [Code Signing Guide](SIGNING_GUIDE.md) - Complete setup guide for macOS, Windows, and Linux code signing
+- **[Complete Documentation](docs/README.md)** - Comprehensive guide with examples
+- **[API Reference](docs/API.md)** - Detailed API documentation
+- **[Package Formats Guide](docs/PACKAGE_FORMATS.md)** - All 20+ supported formats
+- **[Code Signing Guide](docs/CODE_SIGNING.md)** - Multi-platform signing setup
+- **[Examples & Tutorials](docs/EXAMPLES.md)** - Real-world usage examples
+- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
 ---
 
