@@ -181,12 +181,12 @@ func (p *Packager) buildRPMWithVM(ctx context.Context, buildDir, specPath string
 		return "", fmt.Errorf("VM provider not available - install Docker")
 	}
 
-	// Build command to run in container
+	// Build command — shellQuote prevents injection via crafted project name/version
 	cmd := fmt.Sprintf(`
 		yum install -y rpm-build rpmdevtools && \
 		cd /work && \
 		rpmbuild --define "_topdir %s" -bb %s
-	`, buildDir, specPath)
+	`, shellQuote(buildDir), shellQuote(specPath))
 
 	_, err := vmMgr.BuildInVM(ctx, getVMImage(cfg), ".", cmd)
 	if err != nil {
@@ -214,6 +214,12 @@ func getVMImage(cfg *config.Config) string {
 		return cfg.VM.Docker.Image
 	}
 	return "fedora:41"
+}
+
+// shellQuote wraps s in single quotes, escaping any embedded single quotes,
+// so it is safe to interpolate into a sh -c command string.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 func (p *Packager) copyFile(src, dst string) error {

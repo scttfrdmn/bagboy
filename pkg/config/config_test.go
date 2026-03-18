@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -69,6 +70,71 @@ func TestConfigValidation(t *testing.T) {
 			err := tt.config.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Config.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidate_Security(t *testing.T) {
+	validBinaries := map[string]string{"linux-amd64": "bin"}
+
+	tests := []struct {
+		name        string
+		config      *Config
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "path traversal in name",
+			config:      &Config{Name: "../../etc/passwd", Version: "1.0.0", Binaries: validBinaries},
+			wantErr:     true,
+			errContains: "invalid characters",
+		},
+		{
+			name:        "shell injection in name",
+			config:      &Config{Name: "$(rm -rf /)", Version: "1.0.0", Binaries: validBinaries},
+			wantErr:     true,
+			errContains: "invalid characters",
+		},
+		{
+			name:    "valid hyphenated name",
+			config:  &Config{Name: "valid-app", Version: "1.0.0", Binaries: validBinaries},
+			wantErr: false,
+		},
+		{
+			name:    "valid name with dot and underscore",
+			config:  &Config{Name: "valid.app_1", Version: "1.0.0", Binaries: validBinaries},
+			wantErr: false,
+		},
+		{
+			name:        "invalid version string",
+			config:      &Config{Name: "myapp", Version: "not-a-version", Binaries: validBinaries},
+			wantErr:     true,
+			errContains: "version",
+		},
+		{
+			name:    "simple semver version",
+			config:  &Config{Name: "myapp", Version: "1.0.0", Binaries: validBinaries},
+			wantErr: false,
+		},
+		{
+			name:    "pre-release semver version",
+			config:  &Config{Name: "myapp", Version: "1.0.0-beta.1", Binaries: validBinaries},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errContains != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Validate() error = %v, want error containing %q", err, tt.errContains)
+				}
 			}
 		})
 	}

@@ -143,13 +143,13 @@ func (p *Packager) buildDebWithVM(ctx context.Context, sourceDir, outputPath str
 		return "", fmt.Errorf("VM provider not available - install Docker")
 	}
 
-	// Build command
+	// Build command — shellQuote prevents injection via crafted project name/version
 	cmd := fmt.Sprintf(`
 		apt-get update -qq && \
 		apt-get install -y dpkg-dev && \
 		cd /work && \
 		dpkg-deb --build %s %s
-	`, sourceDir, outputPath)
+	`, shellQuote(sourceDir), shellQuote(outputPath))
 
 	_, err := vmMgr.BuildInVM(ctx, getVMImage(cfg), ".", cmd)
 	if err != nil {
@@ -265,6 +265,12 @@ func (p *Packager) createTarGz(sourceDir, outputPath string, exclude []string) e
 
 		return nil
 	})
+}
+
+// shellQuote wraps s in single quotes, escaping any embedded single quotes,
+// so it is safe to interpolate into a sh -c command string.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 func (p *Packager) addFileToAr(arWriter *ar.Writer, filePath, name string) error {

@@ -328,7 +328,7 @@ func (s *Signer) signWindowsBinary(ctx context.Context, binaryPath string) error
 	
 	cmd := exec.CommandContext(ctx, "signtool", "sign",
 		"/sha1", thumbprint,
-		"/t", "http://timestamp.digicert.com",
+		"/t", "https://timestamp.digicert.com",
 		"/fd", "SHA256",
 		binaryPath)
 	

@@ -20,10 +20,18 @@ package config
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	validName    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$`)
+	validVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9._+-]*$`)
 )
 
 // Config is the top-level bagboy project configuration loaded from bagboy.yaml.
@@ -347,13 +355,29 @@ func (c *Config) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("name is required")
 	}
+	if !validName.MatchString(c.Name) {
+		return fmt.Errorf("validation failed: name %q contains invalid characters (must match ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$)", c.Name)
+	}
 	if c.Version == "" {
 		return fmt.Errorf("version is required")
+	}
+	if !validVersion.MatchString(c.Version) {
+		return fmt.Errorf("validation failed: version %q is not a valid semver-like string", c.Version)
 	}
 	if len(c.Binaries) == 0 {
 		return fmt.Errorf("at least one binary is required")
 	}
+	c.validateSecrets()
 	return nil
+}
+
+func (c *Config) validateSecrets() {
+	if c.Signing.MacOS.AppPassword != "" && !strings.HasPrefix(c.Signing.MacOS.AppPassword, "$") {
+		slog.Warn("signing.macos.app_password appears to be a plaintext secret; consider using an env-var reference like $APPLE_APP_PASSWORD")
+	}
+	if c.Signing.SignPath.APIToken != "" && !strings.HasPrefix(c.Signing.SignPath.APIToken, "$") {
+		slog.Warn("signing.signpath.api_token appears to be a plaintext secret; consider using an env-var reference like $SIGNPATH_API_TOKEN")
+	}
 }
 
 // FindConfigFile searches the current directory for a bagboy configuration file

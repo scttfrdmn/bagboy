@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-03-18
+
+### Security
+- `pkg/packager/deb`: shell-quote `sourceDir`/`outputPath` in `buildDebWithVM` to prevent shell injection via crafted project names
+- `pkg/packager/rpm`: shell-quote `buildDir`/`specPath` in `buildRPMWithVM` (same class of issue)
+- `pkg/signing`: upgrade Windows timestamp authority URL from `http://` to `https://timestamp.digicert.com` to prevent MITM on timestamp responses
+- `pkg/config`: add regexp validation for `name` and `version` fields in `Validate()` to block path traversal characters before they reach `filepath.Join` calls in packagers
+- `pkg/config`: emit `slog.Warn` when `app_password` or `api_token` fields appear to contain plaintext secrets rather than env-var references
+
 ## [0.9.1] - 2026-03-18
 
 ### Fixed
