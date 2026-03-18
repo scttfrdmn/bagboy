@@ -55,6 +55,7 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/packager/snap"
 	"github.com/scttfrdmn/bagboy/pkg/packager/spack"
 	"github.com/scttfrdmn/bagboy/pkg/packager/winget"
+	"github.com/scttfrdmn/bagboy/pkg/vm"
 	"gopkg.in/yaml.v3"
 )
 
@@ -1130,6 +1131,28 @@ Examples:
 	depsCmd.AddCommand(depsInstallCmd)
 	depsCmd.AddCommand(depsResolveCmd)
 
+	var vmCmd = &cobra.Command{
+		Use:   "vm",
+		Short: "Manage VM build environments",
+	}
+
+	var vmCheckCmd = &cobra.Command{
+		Use:   "check",
+		Short: "Check VM availability",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ui.Header("VM Status")
+			vmMgr := vm.NewManager(&vm.Config{Enabled: true, Provider: "docker"})
+			if !vmMgr.IsAvailable() {
+				ui.Warning("Docker not available")
+				return nil
+			}
+			ui.Success("✅ Docker available")
+			return nil
+		},
+	}
+
+	vmCmd.AddCommand(vmCheckCmd)
+
 	var versionCmd = &cobra.Command{
 		Use:     "version",
 		Aliases: []string{"v", "--version"},
@@ -1149,6 +1172,7 @@ Examples:
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(benchmarkCmd)
 	rootCmd.AddCommand(depsCmd)
+	rootCmd.AddCommand(vmCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 

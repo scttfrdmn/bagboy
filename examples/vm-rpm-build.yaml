@@ -1,0 +1,23 @@
+# Example: bagboy.yaml with VM support for DEB
+name: myapp
+version: 1.0.0
+description: My awesome application
+homepage: https://myapp.com
+license: MIT
+author: Your Name <you@example.com>
+
+binaries:
+  linux-amd64: dist/myapp-linux-amd64
+
+# Enable VM support for cross-platform builds
+vm:
+  enabled: true
+  provider: docker
+  docker:
+    image: ubuntu:22.04  # Use Ubuntu for DEB builds
+
+packages:
+  deb:
+    maintainer: "you@example.com"
+    section: "utils"
+    priority: "optional"

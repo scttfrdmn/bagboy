@@ -37,6 +37,7 @@ type Config struct {
 	Packages     PackagesConfig     `yaml:"packages"`
 	Signing      SigningConfig      `yaml:"signing"`
 	Dependencies DependenciesConfig `yaml:"dependencies,omitempty"`
+	VM           VMConfig           `yaml:"vm,omitempty"`
 }
 
 type GitHubConfig struct {
@@ -231,4 +232,14 @@ type GitSigningConfig struct {
 	GPGKeyID  string `yaml:"gpg_key_id"`
 	SignTags  bool   `yaml:"sign_tags"`
 	SignCommits bool `yaml:"sign_commits"`
+}
+
+type VMConfig struct {
+	Enabled  bool         `yaml:"enabled"`
+	Provider string       `yaml:"provider"` // docker, multipass, vagrant
+	Docker   DockerVMConfig `yaml:"docker"`
+}
+
+type DockerVMConfig struct {
+	Image string `yaml:"image"`
 }

@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/scttfrdmn/bagboy/pkg/config"
+	"github.com/scttfrdmn/bagboy/pkg/vm"
 )
 
 type Packager struct{}
@@ -128,10 +129,14 @@ cp {{.BinaryName}} $RPM_BUILD_ROOT/usr/bin/{{.Name}}
 func (p *Packager) buildRPM(ctx context.Context, buildDir, specPath string, cfg *config.Config) (string, error) {
 	// Check if rpmbuild is available
 	if _, err := exec.LookPath("rpmbuild"); err != nil {
-		return "", fmt.Errorf("rpmbuild not found - install rpm-build package")
+		// Try VM if enabled
+		if cfg.VM.Enabled {
+			return p.buildRPMWithVM(ctx, buildDir, specPath, cfg)
+		}
+		return "", fmt.Errorf("rpmbuild not found - install rpm-build package or enable VM support in bagboy.yaml")
 	}
 
-	// Build RPM
+	// Build RPM natively
 	cmd := exec.CommandContext(ctx, "rpmbuild",
 		"--define", "_topdir "+buildDir,
 		"-bb", specPath)
@@ -154,6 +159,55 @@ func (p *Packager) buildRPM(ctx context.Context, buildDir, specPath string, cfg 
 	}
 
 	return finalPath, nil
+}
+
+func (p *Packager) buildRPMWithVM(ctx context.Context, buildDir, specPath string, cfg *config.Config) (string, error) {
+	vmMgr := vm.NewManager(&vm.Config{
+		Enabled:  true,
+		Provider: cfg.VM.Provider,
+		Docker: vm.DockerConfig{
+			Image:   getVMImage(cfg),
+			WorkDir: ".",
+		},
+	})
+
+	if !vmMgr.IsAvailable() {
+		return "", fmt.Errorf("VM provider not available - install Docker")
+	}
+
+	// Build command to run in container
+	cmd := fmt.Sprintf(`
+		yum install -y rpm-build rpmdevtools && \
+		cd /work && \
+		rpmbuild --define "_topdir %s" -bb %s
+	`, buildDir, specPath)
+
+	_, err := vmMgr.BuildInVM(ctx, getVMImage(cfg), ".", cmd)
+	if err != nil {
+		return "", fmt.Errorf("VM build failed: %w", err)
+	}
+
+	// Find generated RPM
+	rpmPattern := filepath.Join(buildDir, "RPMS", "x86_64", fmt.Sprintf("%s-%s-*.rpm", cfg.Name, cfg.Version))
+	matches, err := filepath.Glob(rpmPattern)
+	if err != nil || len(matches) == 0 {
+		return "", fmt.Errorf("RPM file not found after build")
+	}
+
+	// Move to dist directory
+	finalPath := filepath.Join("dist", filepath.Base(matches[0]))
+	if err := os.Rename(matches[0], finalPath); err != nil {
+		return "", fmt.Errorf("failed to move RPM: %w", err)
+	}
+
+	return finalPath, nil
+}
+
+func getVMImage(cfg *config.Config) string {
+	if cfg.VM.Docker.Image != "" {
+		return cfg.VM.Docker.Image
+	}
+	return "fedora:38"
 }
 
 func (p *Packager) copyFile(src, dst string) error {

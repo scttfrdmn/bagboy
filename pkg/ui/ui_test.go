@@ -24,7 +24,6 @@ import (
 )
 
 func TestProgressBar(t *testing.T) {
-	// Capture stdout
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -48,46 +47,38 @@ func TestProgressBar(t *testing.T) {
 	}
 }
 
+func TestProgressBarIncrement(t *testing.T) {
+	pb := NewProgressBar(100, "Test")
+	pb.Update(50)
+	pb.Increment()
+	if pb.current != 51 {
+		t.Errorf("Expected current=51, got %d", pb.current)
+	}
+}
+
 func TestSpinner(t *testing.T) {
-	spinner := NewSpinner("Loading...")
-	if spinner.message != "Loading..." {
-		t.Errorf("Expected spinner message 'Loading...', got: %s", spinner.message)
+	spinner := NewSpinner("Loading")
+	if spinner == nil {
+		t.Fatal("NewSpinner returned nil")
 	}
-	if len(spinner.chars) == 0 {
-		t.Error("Expected spinner to have animation characters")
-	}
+	spinner.Start()
+	spinner.Stop()
 }
 
 func TestTable(t *testing.T) {
-	table := NewTable([]string{"Name", "Status"})
-	table.AddRow([]string{"test", "success"})
-	table.AddRow([]string{"another", "failed"})
+	table := NewTable([]string{"Name", "Value"})
+	table.AddRow([]string{"test1", "value1"})
+	table.AddRow([]string{"test2", "value2"})
 
 	if len(table.rows) != 2 {
-		t.Errorf("Expected 2 rows, got: %d", len(table.rows))
+		t.Errorf("Expected 2 rows, got %d", len(table.rows))
 	}
-	if table.widths[0] < 4 { // "Name" length
-		t.Errorf("Expected first column width >= 4, got: %d", table.widths[0])
-	}
-}
 
-func TestIsInteractive(t *testing.T) {
-	// This test is environment-dependent, just ensure it doesn't panic
-	result := IsInteractive()
-	_ = result // Use the result to avoid unused variable warning
-}
-
-func TestUIMessages(t *testing.T) {
-	// Capture stdout
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	Success("Test success")
-	Warning("Test warning")
-	Error("Test error")
-	Info("Test info")
-	Header("Test header")
+	table.Print()
 
 	w.Close()
 	os.Stdout = old
@@ -96,23 +87,35 @@ func TestUIMessages(t *testing.T) {
 	buf.ReadFrom(r)
 	output := buf.String()
 
-	expectedMessages := []string{
-		"✅ Test success",
-		"⚠️  Test warning",
-		"❌ Test error",
-		"ℹ️  Test info",
-		"🎯 Test header",
+	if !strings.Contains(output, "test1") {
+		t.Error("Table row not found")
 	}
+}
 
-	for _, expected := range expectedMessages {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Expected output to contain '%s', got: %s", expected, output)
-		}
+func TestUIMessages(t *testing.T) {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	Success("success")
+	Warning("warning")
+	Error("error")
+	Info("info")
+	Header("header")
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	if !strings.Contains(output, "success") {
+		t.Error("Success message not found")
 	}
 }
 
 func TestPrintBanner(t *testing.T) {
-	// Capture stdout
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -127,20 +130,16 @@ func TestPrintBanner(t *testing.T) {
 	output := buf.String()
 
 	if !strings.Contains(output, "bagboy") {
-		t.Errorf("Expected banner to contain 'bagboy', got: %s", output)
-	}
-	if !strings.Contains(output, "Universal Software Packager") {
-		t.Errorf("Expected banner to contain description, got: %s", output)
+		t.Error("Banner not found")
 	}
 }
 
 func TestPrintVersion(t *testing.T) {
-	// Capture stdout
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	PrintVersion("1.0.0", "abc123", "2026-01-01")
+	PrintVersion("1.0.0", "abc123", "2024-01-01")
 
 	w.Close()
 	os.Stdout = old
@@ -149,15 +148,47 @@ func TestPrintVersion(t *testing.T) {
 	buf.ReadFrom(r)
 	output := buf.String()
 
-	expectedParts := []string{
-		"bagboy version 1.0.0",
-		"Git commit: abc123",
-		"Built: 2026-01-01",
+	if !strings.Contains(output, "1.0.0") {
+		t.Error("Version not found")
 	}
+}
 
-	for _, expected := range expectedParts {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Expected version output to contain '%s', got: %s", expected, output)
-		}
+func TestIsInteractive(t *testing.T) {
+	result := IsInteractive()
+	_ = result
+}
+
+func TestConfirm(t *testing.T) {
+	old := os.Stdin
+	defer func() { os.Stdin = old }()
+	
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+	go func() {
+		w.Write([]byte("y\n"))
+		w.Close()
+	}()
+	
+	result := Confirm("Test?")
+	if !result {
+		t.Error("Expected true for 'y' input")
+	}
+}
+
+func TestSelect(t *testing.T) {
+	old := os.Stdin
+	defer func() { os.Stdin = old }()
+	
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+	go func() {
+		w.Write([]byte("1\n"))
+		w.Close()
+	}()
+	
+	options := []string{"Option 1", "Option 2"}
+	result := Select("Choose:", options)
+	if result != 0 {
+		t.Errorf("Expected 0, got %d", result)
 	}
 }

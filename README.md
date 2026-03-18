@@ -30,6 +30,7 @@ bagboy publish
 - **Universal**: Supports 20 package formats including Homebrew, Scoop, DEB, RPM, AppImage, MSI, Chocolatey, Winget, Docker, Apptainer, Spack
 - **Simple**: One YAML config file, minimal setup
 - **Fast**: Written in Go, parallel packaging
+- **VM Build Support**: Build RPM/DEB on macOS/Windows using Docker 🆕
 - **GitHub Integration**: Automatic releases, tap/bucket management, Winget PRs
 - **Smart Installer**: Generates curl|bash scripts with OS detection
 - **Code Signing**: Built-in support for macOS, Windows, Linux, Sigstore, SignPath.io, and Git signing
@@ -169,6 +170,11 @@ bagboy pack --all              # All supported formats
 bagboy pack --brew --scoop     # Specific formats
 bagboy pack --deb --installer  # Multiple formats
 
+# VM builds (build Linux packages on macOS/Windows)
+bagboy vm check                # Check Docker availability
+bagboy pack --rpm              # Builds in Fedora container
+bagboy pack --deb              # Builds in Ubuntu container
+
 # Code signing
 bagboy sign --check            # Check signing setup
 bagboy sign --binary app       # Sign specific binary
@@ -180,6 +186,37 @@ bagboy validate
 bagboy publish                 # Pack + GitHub release + distribution
 bagboy publish --dry-run       # Preview what would happen
 ```
+
+## 🐳 VM Build Support (New!)
+
+Build Linux packages from any OS without installing platform-specific tools:
+
+```yaml
+# bagboy.yaml
+vm:
+  enabled: true
+  provider: docker
+```
+
+```bash
+# Build RPM on macOS
+$ bagboy pack --rpm
+🐳 Building in Fedora container...
+✅ dist/myapp-1.0.0-1.x86_64.rpm
+
+# Build DEB on Windows
+$ bagboy pack --deb
+🐳 Building in Ubuntu container...
+✅ dist/myapp_1.0.0_amd64.deb
+```
+
+**Benefits:**
+- ✅ No manual tool installation (rpmbuild, dpkg-deb)
+- ✅ Reproducible builds across environments
+- ✅ Perfect for CI/CD pipelines
+- ✅ Automatic container management
+
+See [VM Build Guide](docs/VM_BUILD_GUIDE.md) for details.
 
 ## 🔄 Typical Workflow
 
@@ -308,9 +345,11 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## 📚 Documentation
 
 - **[Complete Documentation](docs/README.md)** - Comprehensive guide with examples
+- **[VM Build Guide](docs/VM_BUILD_GUIDE.md)** - Cross-platform builds with Docker 🆕
 - **[API Reference](docs/API.md)** - Detailed API documentation
 - **[Package Formats Guide](docs/PACKAGE_FORMATS.md)** - All 20+ supported formats
 - **[Code Signing Guide](docs/CODE_SIGNING.md)** - Multi-platform signing setup
+- **[Dependency Management](docs/DEPENDENCIES.md)** - Managing dependencies
 - **[Examples & Tutorials](docs/EXAMPLES.md)** - Real-world usage examples
 - **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 

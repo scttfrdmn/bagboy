@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -14,6 +15,7 @@ import (
 	"github.com/blakesmith/ar"
 	"github.com/scttfrdmn/bagboy/pkg/config"
 	"github.com/scttfrdmn/bagboy/pkg/errors"
+	"github.com/scttfrdmn/bagboy/pkg/vm"
 )
 
 type Packager struct{}
@@ -102,7 +104,60 @@ func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error)
 		return "", err
 	}
 
-	return outputPath, p.createDebPackage(tempDir, outputPath)
+	// Try dpkg-deb first, fall back to VM if not available
+	if _, err := exec.LookPath("dpkg-deb"); err != nil {
+		if cfg.VM.Enabled {
+			return p.buildDebWithVM(ctx, tempDir, outputPath, cfg)
+		}
+		return "", fmt.Errorf("dpkg-deb not found - install dpkg package or enable VM support")
+	}
+
+	return outputPath, p.buildDebNative(ctx, tempDir, outputPath)
+}
+
+func (p *Packager) buildDebNative(ctx context.Context, sourceDir, outputPath string) error {
+	cmd := exec.CommandContext(ctx, "dpkg-deb", "--build", sourceDir, outputPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("dpkg-deb failed: %w\nOutput: %s", err, output)
+	}
+	return nil
+}
+
+func (p *Packager) buildDebWithVM(ctx context.Context, sourceDir, outputPath string, cfg *config.Config) (string, error) {
+	vmMgr := vm.NewManager(&vm.Config{
+		Enabled:  true,
+		Provider: cfg.VM.Provider,
+		Docker: vm.DockerConfig{
+			Image:   getVMImage(cfg),
+			WorkDir: ".",
+		},
+	})
+
+	if !vmMgr.IsAvailable() {
+		return "", fmt.Errorf("VM provider not available - install Docker")
+	}
+
+	// Build command
+	cmd := fmt.Sprintf(`
+		apt-get update -qq && \
+		apt-get install -y dpkg-dev && \
+		cd /work && \
+		dpkg-deb --build %s %s
+	`, sourceDir, outputPath)
+
+	_, err := vmMgr.BuildInVM(ctx, getVMImage(cfg), ".", cmd)
+	if err != nil {
+		return "", fmt.Errorf("VM build failed: %w", err)
+	}
+
+	return outputPath, nil
+}
+
+func getVMImage(cfg *config.Config) string {
+	if cfg.VM.Docker.Image != "" {
+		return cfg.VM.Docker.Image
+	}
+	return "ubuntu:22.04"
 }
 
 func (p *Packager) createControlFile(path string, cfg *config.Config) error {

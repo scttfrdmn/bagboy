@@ -16,6 +16,9 @@ Comprehensive guide to all 20+ supported package formats, including configuratio
 ### [🔐 Code Signing Guide](CODE_SIGNING.md)
 Complete setup guide for code signing across macOS, Windows, Linux, and modern solutions like Sigstore.
 
+### [📚 Dependency Management Guide](DEPENDENCIES.md) ✨ NEW
+Complete guide to managing system dependencies, package managers, and runtime requirements across platforms.
+
 ### [💡 Examples & Tutorials](EXAMPLES.md)
 Real-world examples and step-by-step tutorials for different languages, platforms, and use cases.
 
@@ -64,9 +67,9 @@ Common issues, solutions, and debugging techniques to help you resolve problems 
 
 ## 📊 Documentation Stats
 
-- **6 comprehensive guides** covering all aspects of bagboy
+- **7 comprehensive guides** covering all aspects of bagboy
 - **20+ package formats** with detailed configuration examples
-- **50+ code examples** for different languages and platforms
+- **60+ code examples** for different languages and platforms
 - **100+ troubleshooting solutions** for common issues
 - **Multi-platform support** for macOS, Windows, and Linux
 
