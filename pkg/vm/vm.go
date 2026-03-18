@@ -1,3 +1,5 @@
+// Package vm provides VM build environment management using Docker,
+// Multipass, and Vagrant providers for cross-platform compilation.
 package vm
 
 import (
@@ -24,6 +26,7 @@ type Config struct {
 	Docker   DockerConfig
 }
 
+// DockerConfig holds Docker-specific VM build settings.
 type DockerConfig struct {
 	Image   string
 	WorkDir string

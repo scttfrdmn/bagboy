@@ -1,3 +1,5 @@
+// Package init provides project auto-detection and interactive scaffolding
+// for new bagboy configurations.
 package init
 
 import (

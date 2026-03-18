@@ -1,3 +1,4 @@
+// Package rpm implements the rpm packager for bagboy.
 package rpm
 
 import (
@@ -13,16 +14,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/vm"
 )
 
+// Packager creates rpm packages for RedHat/CentOS distribution.
 type Packager struct{}
 
+// New returns a new rpm Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "rpm".
 func (p *Packager) Name() string {
 	return "rpm"
 }
 
+// Validate checks that cfg has the required fields for rpm packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Packages.RPM.Vendor == "" {
 		return fmt.Errorf("rpm.vendor is required")
@@ -30,6 +35,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates rpm artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Find Linux binary
 	var linuxBinary string

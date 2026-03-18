@@ -1,3 +1,4 @@
+// Package flatpak implements the flatpak packager for bagboy.
 package flatpak
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates flatpak packages for Linux Flatpak app bundle distribution.
 type Packager struct{}
 
+// New returns a new flatpak Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "flatpak".
 func (p *Packager) Name() string {
 	return "flatpak"
 }
 
+// Validate checks that cfg has the required fields for flatpak packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Homepage == "" {
 		return fmt.Errorf("homepage is required for flatpak manifest")
@@ -28,6 +33,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates flatpak artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Find Linux binary
 	var linuxBinary string

@@ -1,3 +1,4 @@
+// Package checksum provides SHA256 checksum calculation and verification for files.
 package checksum
 
 import (

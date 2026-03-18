@@ -1,3 +1,4 @@
+// Package docker implements the docker packager for bagboy.
 package docker
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates docker packages for Docker container image distribution.
 type Packager struct{}
 
+// New returns a new docker Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "docker".
 func (p *Packager) Name() string {
 	return "docker"
 }
 
+// Validate checks that cfg has the required fields for docker packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Description == "" {
 		return fmt.Errorf("description is required for Docker image")
@@ -28,6 +33,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates docker artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	dockerDir := filepath.Join("dist", "docker")
 	if err := os.MkdirAll(dockerDir, 0755); err != nil {

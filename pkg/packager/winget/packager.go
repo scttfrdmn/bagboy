@@ -1,3 +1,4 @@
+// Package winget implements the winget packager for bagboy.
 package winget
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates winget packages for Windows Winget manifest distribution.
 type Packager struct{}
 
+// New returns a new winget Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "winget".
 func (p *Packager) Name() string {
 	return "winget"
 }
 
+// Validate checks that cfg has the required fields for winget packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Packages.Winget.PackageIdentifier == "" {
 		return fmt.Errorf("winget.package_identifier is required")
@@ -42,6 +47,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates winget artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Create manifests directory structure
 	parts := strings.Split(cfg.Packages.Winget.PackageIdentifier, ".")

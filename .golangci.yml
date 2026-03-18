@@ -1,0 +1,37 @@
+run:
+  timeout: 5m
+  go: "1.24"
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - revive
+    - gocyclo
+    - ineffassign
+    - misspell
+    - errcheck
+    - staticcheck
+    - gosimple
+    - unused
+    - goimports
+    - bodyclose
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  revive:
+    rules:
+      - name: exported
+      - name: var-naming
+      - name: package-comments
+  misspell:
+    locale: US
+  goimports:
+    local-prefixes: github.com/scttfrdmn/bagboy
+
+issues:
+  exclude-rules:
+    - path: "_test.go"
+      linters:
+        - errcheck

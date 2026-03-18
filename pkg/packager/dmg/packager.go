@@ -1,3 +1,4 @@
+// Package dmg implements the dmg packager for bagboy.
 package dmg
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates dmg packages for macOS disk image distribution.
 type Packager struct{}
 
+// New returns a new dmg Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "dmg".
 func (p *Packager) Name() string {
 	return "dmg"
 }
 
+// Validate checks that cfg has the required fields for dmg packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	// Find macOS binary
 	for arch := range cfg.Binaries {
@@ -31,6 +36,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return fmt.Errorf("no macOS binary found for DMG creation")
 }
 
+// Pack generates dmg artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Find macOS binary
 	var darwinBinary string

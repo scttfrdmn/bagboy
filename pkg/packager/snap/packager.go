@@ -1,3 +1,4 @@
+// Package snap implements the snap packager for bagboy.
 package snap
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates snap packages for Linux Snap distribution.
 type Packager struct{}
 
+// New returns a new snap Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "snap".
 func (p *Packager) Name() string {
 	return "snap"
 }
 
+// Validate checks that cfg has the required fields for snap packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Description == "" {
 		return fmt.Errorf("description is required for snap package")
@@ -28,6 +33,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates snap artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Find Linux binary
 	var linuxBinary string

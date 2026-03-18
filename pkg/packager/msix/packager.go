@@ -1,3 +1,4 @@
+// Package msix implements the msix packager for bagboy.
 package msix
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates msix packages for Windows MSIX distribution.
 type Packager struct{}
 
+// New returns a new msix Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "msix".
 func (p *Packager) Name() string {
 	return "msix"
 }
 
+// Validate checks that cfg has the required fields for msix packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	for arch := range cfg.Binaries {
 		if strings.HasPrefix(arch, "windows-") {
@@ -30,6 +35,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return fmt.Errorf("no Windows binary found for MSIX creation")
 }
 
+// Pack generates msix artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	var windowsBinary string
 	for arch, path := range cfg.Binaries {

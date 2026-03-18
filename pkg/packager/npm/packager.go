@@ -1,3 +1,4 @@
+// Package npm implements the npm packager for bagboy.
 package npm
 
 import (
@@ -10,16 +11,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates npm packages for npm registry distribution.
 type Packager struct{}
 
+// New returns a new npm Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "npm".
 func (p *Packager) Name() string {
 	return "npm"
 }
 
+// Validate checks that cfg has the required fields for npm packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Description == "" {
 		return fmt.Errorf("description is required for npm package")
@@ -27,6 +32,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates npm artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Find appropriate binary for npm (prefer linux, fallback to others)
 	var binary string

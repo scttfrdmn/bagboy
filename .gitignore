@@ -30,3 +30,6 @@ Thumbs.db
 # Local config overrides
 bagboy.local.yaml
 .env.local
+
+# Root-level compiled binary
+/bagboy

@@ -1,3 +1,4 @@
+// Package apptainer implements the Apptainer packager for bagboy.
 package apptainer
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates Apptainer packages for Apptainer/Singularity HPC distribution.
 type Packager struct{}
 
+// New returns a new apptainer Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "apptainer".
 func (p *Packager) Name() string {
 	return "apptainer"
 }
 
+// Validate checks that cfg has the required fields for apptainer packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Description == "" {
 		return fmt.Errorf("description is required for Apptainer definition")
@@ -28,6 +33,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates apptainer artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Find Linux binary (Apptainer primarily runs on Linux)
 	var linuxBinary string

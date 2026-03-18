@@ -1,3 +1,4 @@
+// Package msi implements the msi packager for bagboy.
 package msi
 
 import (
@@ -13,16 +14,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates msi packages for Windows MSI installer distribution.
 type Packager struct{}
 
+// New returns a new msi Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "msi".
 func (p *Packager) Name() string {
 	return "msi"
 }
 
+// Validate checks that cfg has the required fields for msi packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	// Find Windows binary
 	for arch := range cfg.Binaries {
@@ -33,6 +38,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return fmt.Errorf("no Windows binary found for MSI creation")
 }
 
+// Pack generates msi artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Find Windows binary
 	var windowsBinary string

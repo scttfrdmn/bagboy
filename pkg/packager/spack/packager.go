@@ -1,3 +1,4 @@
+// Package spack implements the spack packager for bagboy.
 package spack
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates spack packages for Spack HPC distribution.
 type Packager struct{}
 
+// New returns a new spack Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "spack".
 func (p *Packager) Name() string {
 	return "spack"
 }
 
+// Validate checks that cfg has the required fields for spack packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Homepage == "" {
 		return fmt.Errorf("homepage is required for Spack package")
@@ -28,6 +33,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates spack artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	spackDir := filepath.Join("dist", "spack")
 	if err := os.MkdirAll(spackDir, 0755); err != nil {

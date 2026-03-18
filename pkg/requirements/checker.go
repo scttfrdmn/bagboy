@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package requirements provides system requirement checking for bagboy package
+// formats, verifying that necessary external tools are installed and available.
 package requirements
 
 import (

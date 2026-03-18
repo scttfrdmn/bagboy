@@ -1,3 +1,4 @@
+// Package cargo implements the cargo packager for bagboy.
 package cargo
 
 import (
@@ -10,16 +11,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates cargo packages for Rust Cargo registry distribution.
 type Packager struct{}
 
+// New returns a new cargo Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "cargo".
 func (p *Packager) Name() string {
 	return "cargo"
 }
 
+// Validate checks that cfg has the required fields for cargo packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Homepage == "" {
 		return fmt.Errorf("homepage is required for Cargo package")
@@ -27,6 +32,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates cargo artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	cargoDir := filepath.Join("dist", "cargo")
 	if err := os.MkdirAll(cargoDir, 0755); err != nil {

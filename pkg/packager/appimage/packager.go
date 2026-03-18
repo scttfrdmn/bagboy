@@ -1,3 +1,4 @@
+// Package appimage implements the AppImage packager for bagboy.
 package appimage
 
 import (
@@ -12,16 +13,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates AppImage packages for Linux app bundle distribution.
 type Packager struct{}
 
+// New returns a new appimage Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "appimage".
 func (p *Packager) Name() string {
 	return "appimage"
 }
 
+// Validate checks that cfg has the required fields for appimage packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if len(cfg.Packages.AppImage.Categories) == 0 {
 		return fmt.Errorf("appimage.categories is required")
@@ -29,6 +34,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates appimage artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Find Linux binary
 	var linuxBinary string

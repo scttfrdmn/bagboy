@@ -1,16 +1,24 @@
-.PHONY: build test clean install run-init lint coverage quality
+.PHONY: build build-all test clean install run-init lint coverage quality fmt vet deps security mocks
+
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.8.0-dev")
+COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
+DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -ldflags "-s -w \
+  -X github.com/scttfrdmn/bagboy/internal/version.Version=$(VERSION) \
+  -X github.com/scttfrdmn/bagboy/internal/version.Commit=$(COMMIT) \
+  -X github.com/scttfrdmn/bagboy/internal/version.Date=$(DATE)"
 
 # Build the binary
 build:
-	go build -o bin/bagboy ./cmd/bagboy
+	go build $(LDFLAGS) -o bin/bagboy ./cmd/bagboy
 
 # Build for all platforms
 build-all:
-	GOOS=darwin GOARCH=amd64 go build -o dist/bagboy-darwin-amd64 ./cmd/bagboy
-	GOOS=darwin GOARCH=arm64 go build -o dist/bagboy-darwin-arm64 ./cmd/bagboy
-	GOOS=linux GOARCH=amd64 go build -o dist/bagboy-linux-amd64 ./cmd/bagboy
-	GOOS=linux GOARCH=arm64 go build -o dist/bagboy-linux-arm64 ./cmd/bagboy
-	GOOS=windows GOARCH=amd64 go build -o dist/bagboy-windows-amd64.exe ./cmd/bagboy
+	GOOS=darwin  GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-darwin-amd64 ./cmd/bagboy
+	GOOS=darwin  GOARCH=arm64 go build $(LDFLAGS) -o dist/bagboy-darwin-arm64 ./cmd/bagboy
+	GOOS=linux   GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-linux-amd64  ./cmd/bagboy
+	GOOS=linux   GOARCH=arm64 go build $(LDFLAGS) -o dist/bagboy-linux-arm64  ./cmd/bagboy
+	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-windows-amd64.exe ./cmd/bagboy
 
 # Test the application
 test:

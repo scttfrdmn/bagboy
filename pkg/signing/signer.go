@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package signing provides code signing support for macOS, Windows, Linux,
+// Sigstore, SignPath.io, and git commit/tag signing.
 package signing
 
 import (

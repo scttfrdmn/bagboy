@@ -1,3 +1,4 @@
+// Package nix implements the nix packager for bagboy.
 package nix
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates nix packages for NixOS distribution.
 type Packager struct{}
 
+// New returns a new nix Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "nix".
 func (p *Packager) Name() string {
 	return "nix"
 }
 
+// Validate checks that cfg has the required fields for nix packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Homepage == "" {
 		return fmt.Errorf("homepage is required for Nix package")
@@ -28,6 +33,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates nix artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	nixDir := filepath.Join("dist", "nix")
 	if err := os.MkdirAll(nixDir, 0755); err != nil {

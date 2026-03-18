@@ -1,3 +1,4 @@
+// Package pypi implements the pypi packager for bagboy.
 package pypi
 
 import (
@@ -11,16 +12,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates pypi packages for Python PyPI distribution.
 type Packager struct{}
 
+// New returns a new pypi Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "pypi".
 func (p *Packager) Name() string {
 	return "pypi"
 }
 
+// Validate checks that cfg has the required fields for pypi packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Author == "" {
 		return fmt.Errorf("author is required for PyPI package")
@@ -28,6 +33,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates pypi artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	pypiDir := filepath.Join("dist", "pypi")
 	if err := os.MkdirAll(pypiDir, 0755); err != nil {

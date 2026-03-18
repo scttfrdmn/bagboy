@@ -1,3 +1,5 @@
+// Package github provides a GitHub API client for creating releases,
+// updating Homebrew taps, Scoop buckets, and submitting Winget PRs.
 package github
 
 import (

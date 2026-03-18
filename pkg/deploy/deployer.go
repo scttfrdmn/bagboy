@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package deploy provides deployment orchestration for pushing packages to
+// registries and repositories such as Homebrew taps, npm, Docker Hub, and more.
 package deploy
 
 import (

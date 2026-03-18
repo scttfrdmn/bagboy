@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Build all platforms
+      run: make build-all
+
+    - name: Determine pre-release
+      id: prerelease
+      run: |
+        TAG="${GITHUB_REF#refs/tags/}"
+        if echo "$TAG" | grep -qE '\-(rc|beta|alpha)'; then
+          echo "prerelease=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "prerelease=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        prerelease: ${{ steps.prerelease.outputs.prerelease == 'true' }}
+        generate_release_notes: true
+        files: |
+          dist/bagboy-darwin-amd64
+          dist/bagboy-darwin-arm64
+          dist/bagboy-linux-amd64
+          dist/bagboy-linux-arm64
+          dist/bagboy-windows-amd64.exe

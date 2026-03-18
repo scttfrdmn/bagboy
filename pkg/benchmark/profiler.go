@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package benchmark provides performance profiling and benchmarking utilities
+// for measuring bagboy packaging throughput and resource usage.
 package benchmark
 
 import (

@@ -1,3 +1,4 @@
+// Package deb implements the deb packager for bagboy.
 package deb
 
 import (
@@ -18,16 +19,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/vm"
 )
 
+// Packager creates deb packages for Debian/Ubuntu distribution.
 type Packager struct{}
 
+// New returns a new deb Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "deb".
 func (p *Packager) Name() string {
 	return "deb"
 }
 
+// Validate checks that cfg has the required fields for deb packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Packages.Deb.Maintainer == "" {
 		return errors.InvalidConfigError("deb.maintainer", "maintainer email is required for DEB packages")
@@ -35,6 +40,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates deb artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	// Create temp directory for package structure
 	tempDir := filepath.Join(os.TempDir(), fmt.Sprintf("%s-deb-%s", cfg.Name, cfg.Version))

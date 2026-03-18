@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -90,7 +91,7 @@ binaries:
 	}
 
 	// Test successful load
-	cfg, err := Load(configPath)
+	cfg, err := Load(context.Background(), configPath)
 	if err != nil {
 		t.Errorf("Load() failed: %v", err)
 	}
@@ -104,7 +105,7 @@ binaries:
 	}
 
 	// Test load non-existent file
-	_, err = Load("non-existent.yaml")
+	_, err = Load(context.Background(), "non-existent.yaml")
 	if err == nil {
 		t.Error("Expected error loading non-existent file")
 	}
@@ -116,7 +117,7 @@ binaries:
 		t.Fatalf("Failed to create invalid config: %v", err)
 	}
 
-	_, err = Load(invalidPath)
+	_, err = Load(context.Background(), invalidPath)
 	if err == nil {
 		t.Error("Expected error loading invalid YAML")
 	}

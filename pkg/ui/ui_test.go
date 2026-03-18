@@ -18,6 +18,7 @@ package ui
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -61,7 +62,7 @@ func TestSpinner(t *testing.T) {
 	if spinner == nil {
 		t.Fatal("NewSpinner returned nil")
 	}
-	spinner.Start()
+	spinner.Start(context.Background())
 	spinner.Stop()
 }
 

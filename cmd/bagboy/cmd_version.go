@@ -17,32 +17,24 @@ limitations under the License.
 package main
 
 import (
-	"context"
-	"os"
-	"os/signal"
-	"syscall"
+	"github.com/spf13/cobra"
 
-	"github.com/scttfrdmn/bagboy/pkg/errors"
+	"github.com/scttfrdmn/bagboy/internal/version"
 	"github.com/scttfrdmn/bagboy/pkg/ui"
 )
 
-func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		if bagboyErr, ok := err.(*errors.BagboyError); ok {
-			ui.Error(bagboyErr.Message)
-			if len(bagboyErr.Suggestions) > 0 {
-				ui.Info("💡 " + bagboyErr.Suggestions[0])
-			}
-			if bagboyErr.Details != "" {
-				ui.Info("📋 " + bagboyErr.Details)
-			}
-		} else {
-			ui.Error(err.Error())
-			ui.Info("💡 Run 'bagboy --help' for usage information")
-		}
-		os.Exit(1)
+// newVersionCmd returns the cobra Command for the 'version' subcommand.
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "version",
+		Aliases: []string{"--version"},
+		Short:   "Show version information",
+		RunE:    runVersion,
 	}
+}
+
+// runVersion implements the 'version' subcommand logic.
+func runVersion(_ *cobra.Command, _ []string) error {
+	ui.PrintVersion(version.Version, version.Commit, version.Date)
+	return nil
 }

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package deps provides dependency management including resolution, installation,
+// caching, and lock-file generation for bagboy projects.
 package deps
 
 import (

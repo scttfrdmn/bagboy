@@ -1,3 +1,4 @@
+// Package brew implements the brew packager for bagboy.
 package brew
 
 import (
@@ -10,16 +11,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates brew packages for Homebrew macOS distribution.
 type Packager struct{}
 
+// New returns a new brew Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "brew".
 func (p *Packager) Name() string {
 	return "brew"
 }
 
+// Validate checks that cfg has the required fields for brew packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Homepage == "" {
 		return fmt.Errorf("homepage is required for brew formula")
@@ -27,6 +32,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates brew artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	tmpl := `class {{.ClassName}} < Formula
   desc "{{.Description}}"

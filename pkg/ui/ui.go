@@ -14,16 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package ui provides terminal output utilities including progress bars,
+// spinners, tables, and formatted message helpers.
 package ui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 )
 
-// ProgressBar represents a simple progress bar
+// ProgressBar renders a simple ASCII progress bar to stdout.
 type ProgressBar struct {
 	total   int
 	current int
@@ -31,7 +34,8 @@ type ProgressBar struct {
 	prefix  string
 }
 
-// NewProgressBar creates a new progress bar
+// NewProgressBar creates a new ProgressBar with the given total step count and
+// display prefix.
 func NewProgressBar(total int, prefix string) *ProgressBar {
 	return &ProgressBar{
 		total:  total,
@@ -40,19 +44,19 @@ func NewProgressBar(total int, prefix string) *ProgressBar {
 	}
 }
 
-// Update updates the progress bar
+// Update sets the progress bar to current and re-renders it.
 func (pb *ProgressBar) Update(current int) {
 	pb.current = current
 	pb.render()
 }
 
-// Increment increments the progress bar by 1
+// Increment advances the progress bar by one step and re-renders it.
 func (pb *ProgressBar) Increment() {
 	pb.current++
 	pb.render()
 }
 
-// Finish completes the progress bar
+// Finish sets the progress bar to 100 % and prints a trailing newline.
 func (pb *ProgressBar) Finish() {
 	pb.current = pb.total
 	pb.render()
@@ -62,14 +66,14 @@ func (pb *ProgressBar) Finish() {
 func (pb *ProgressBar) render() {
 	percent := float64(pb.current) / float64(pb.total)
 	filled := int(percent * float64(pb.width))
-	
+
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", pb.width-filled)
-	
-	fmt.Printf("\r%s [%s] %d/%d (%.1f%%)", 
+
+	fmt.Printf("\r%s [%s] %d/%d (%.1f%%)",
 		pb.prefix, bar, pb.current, pb.total, percent*100)
 }
 
-// Spinner represents a simple spinner
+// Spinner renders an animated braille spinner to stdout while work is in progress.
 type Spinner struct {
 	chars   []string
 	current int
@@ -77,7 +81,7 @@ type Spinner struct {
 	active  bool
 }
 
-// NewSpinner creates a new spinner
+// NewSpinner creates a new Spinner with the given status message.
 func NewSpinner(message string) *Spinner {
 	return &Spinner{
 		chars:   []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
@@ -85,51 +89,64 @@ func NewSpinner(message string) *Spinner {
 	}
 }
 
-// Start starts the spinner
-func (s *Spinner) Start() {
+// Start launches the spinner animation in a background goroutine.
+// The goroutine exits when either Stop is called or ctx is cancelled,
+// preventing a goroutine leak on context cancellation.
+func (s *Spinner) Start(ctx context.Context) {
 	s.active = true
 	go func() {
-		for s.active {
-			fmt.Printf("\r%s %s", s.chars[s.current], s.message)
-			s.current = (s.current + 1) % len(s.chars)
-			time.Sleep(100 * time.Millisecond)
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				s.active = false
+				return
+			case <-ticker.C:
+				if !s.active {
+					return
+				}
+				fmt.Printf("\r%s %s", s.chars[s.current], s.message)
+				s.current = (s.current + 1) % len(s.chars)
+			}
 		}
 	}()
 }
 
-// Stop stops the spinner
+// Stop halts the spinner and clears the line.
 func (s *Spinner) Stop() {
 	s.active = false
 	fmt.Print("\r" + strings.Repeat(" ", len(s.message)+10) + "\r")
 }
 
-// Success displays a success message
+// Success prints a success message prefixed with a check-mark emoji.
 func Success(message string) {
 	fmt.Printf("✅ %s\n", message)
 }
 
-// Warning displays a warning message
+// Warning prints a warning message prefixed with a warning emoji.
 func Warning(message string) {
 	fmt.Printf("⚠️  %s\n", message)
 }
 
-// Error displays an error message
+// Error prints an error message prefixed with a cross emoji.
 func Error(message string) {
 	fmt.Printf("❌ %s\n", message)
 }
 
-// Info displays an info message
+// Info prints an informational message prefixed with an info emoji.
 func Info(message string) {
 	fmt.Printf("ℹ️  %s\n", message)
 }
 
-// Header displays a section header
+// Header prints a section header with a horizontal rule.
 func Header(message string) {
 	fmt.Printf("\n🎯 %s\n", message)
 	fmt.Println(strings.Repeat("─", len(message)+4))
 }
 
-// Confirm prompts for user confirmation
+// Confirm prompts the user with a yes/no question and returns true when the
+// user answers "y" or "yes" (case-insensitive).
 func Confirm(message string) bool {
 	fmt.Printf("❓ %s (y/N): ", message)
 	var response string
@@ -138,31 +155,32 @@ func Confirm(message string) bool {
 	return response == "y" || response == "yes"
 }
 
-// Select prompts user to select from options
+// Select prompts the user to choose from a numbered list of options and returns
+// the zero-based index of the chosen item, or 0 on invalid input.
 func Select(message string, options []string) int {
 	fmt.Printf("❓ %s\n", message)
 	for i, option := range options {
 		fmt.Printf("  %d) %s\n", i+1, option)
 	}
 	fmt.Print("Enter choice (1-", len(options), "): ")
-	
+
 	var choice int
 	fmt.Scanln(&choice)
-	
+
 	if choice < 1 || choice > len(options) {
 		return 0
 	}
 	return choice - 1
 }
 
-// Table displays data in a table format
+// Table renders tabular data with box-drawing borders.
 type Table struct {
 	headers []string
 	rows    [][]string
 	widths  []int
 }
 
-// NewTable creates a new table
+// NewTable creates a new Table with the given column headers.
 func NewTable(headers []string) *Table {
 	widths := make([]int, len(headers))
 	for i, header := range headers {
@@ -174,7 +192,7 @@ func NewTable(headers []string) *Table {
 	}
 }
 
-// AddRow adds a row to the table
+// AddRow appends a row to the table, expanding column widths as necessary.
 func (t *Table) AddRow(row []string) {
 	for i, cell := range row {
 		if i < len(t.widths) && len(cell) > t.widths[i] {
@@ -184,9 +202,9 @@ func (t *Table) AddRow(row []string) {
 	t.rows = append(t.rows, row)
 }
 
-// Print prints the table
+// Print renders the table to stdout using Unicode box-drawing characters.
 func (t *Table) Print() {
-	// Print header
+	// Top border.
 	fmt.Print("┌")
 	for i, width := range t.widths {
 		fmt.Print(strings.Repeat("─", width+2))
@@ -195,15 +213,15 @@ func (t *Table) Print() {
 		}
 	}
 	fmt.Println("┐")
-	
-	// Print header row
+
+	// Header row.
 	fmt.Print("│")
 	for i, header := range t.headers {
 		fmt.Printf(" %-*s │", t.widths[i], header)
 	}
 	fmt.Println()
-	
-	// Print separator
+
+	// Header/body separator.
 	fmt.Print("├")
 	for i, width := range t.widths {
 		fmt.Print(strings.Repeat("─", width+2))
@@ -212,8 +230,8 @@ func (t *Table) Print() {
 		}
 	}
 	fmt.Println("┤")
-	
-	// Print rows
+
+	// Data rows.
 	for _, row := range t.rows {
 		fmt.Print("│")
 		for i, cell := range row {
@@ -223,8 +241,8 @@ func (t *Table) Print() {
 		}
 		fmt.Println()
 	}
-	
-	// Print bottom border
+
+	// Bottom border.
 	fmt.Print("└")
 	for i, width := range t.widths {
 		fmt.Print(strings.Repeat("─", width+2))
@@ -235,7 +253,7 @@ func (t *Table) Print() {
 	fmt.Println("┘")
 }
 
-// PrintBanner prints a welcome banner
+// PrintBanner prints the bagboy welcome banner to stdout.
 func PrintBanner() {
 	banner := `
 🎒 bagboy - Universal Software Packager
@@ -245,7 +263,7 @@ Pack once. Ship everywhere.
 	fmt.Print(banner)
 }
 
-// PrintVersion prints version information
+// PrintVersion prints version, commit, and build-date information to stdout.
 func PrintVersion(version, commit, date string) {
 	fmt.Printf("bagboy version %s\n", version)
 	if commit != "" {
@@ -256,7 +274,7 @@ func PrintVersion(version, commit, date string) {
 	}
 }
 
-// IsInteractive checks if we're running in an interactive terminal
+// IsInteractive reports whether stdin is connected to an interactive terminal.
 func IsInteractive() bool {
 	stat, err := os.Stdin.Stat()
 	if err != nil {

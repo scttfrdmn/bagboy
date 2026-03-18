@@ -1,3 +1,4 @@
+// Package installer implements the installer packager for bagboy.
 package installer
 
 import (
@@ -10,16 +11,20 @@ import (
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// Packager creates installer packages for curl|bash install script distribution.
 type Packager struct{}
 
+// New returns a new installer Packager.
 func New() *Packager {
 	return &Packager{}
 }
 
+// Name returns the packager name "installer".
 func (p *Packager) Name() string {
 	return "installer"
 }
 
+// Validate checks that cfg has the required fields for installer packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
 	if cfg.Installer.BaseURL == "" {
 		return fmt.Errorf("installer.base_url is required")
@@ -27,6 +32,7 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return nil
 }
 
+// Pack generates installer artifacts from cfg and returns the output path.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
 	tmpl := `#!/bin/bash
 set -e
