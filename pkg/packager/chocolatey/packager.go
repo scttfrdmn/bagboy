@@ -201,7 +201,7 @@ Write-Host "{{.Name}} has been uninstalled successfully!" -ForegroundColor Green
 }
 
 func (p *Packager) buildPackage(ctx context.Context, buildDir string, cfg *config.Config) (string, error) {
-	outputPath := filepath.Join("dist", fmt.Sprintf("%s.%s.nupkg", cfg.Name, cfg.Version))
+	outputPath := filepath.Join("dist", fmt.Sprintf("%s-%s.nupkg", cfg.Name, cfg.Version))
 
 	// Try choco pack first
 	if _, err := exec.LookPath("choco"); err == nil {

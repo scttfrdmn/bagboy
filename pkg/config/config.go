@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -160,6 +161,40 @@ type PackagesConfig struct {
 	RPM        RPMConfig        `yaml:"rpm"`
 	// AppImage holds AppImage settings.
 	AppImage   AppImageConfig   `yaml:"appimage"`
+
+	// configured tracks which package-format keys were explicitly present in the YAML.
+	configured map[string]bool
+}
+
+// UnmarshalYAML implements yaml.Unmarshaler so we can record which format keys
+// were explicitly listed under packages: — even when their value is an empty map.
+func (p *PackagesConfig) UnmarshalYAML(value *yaml.Node) error {
+	// Decode into the struct fields normally.
+	type plain PackagesConfig
+	if err := value.Decode((*plain)(p)); err != nil {
+		return err
+	}
+	// Walk the mapping node to record every present key.
+	p.configured = make(map[string]bool)
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		p.configured[value.Content[i].Value] = true
+	}
+	return nil
+}
+
+// ConfiguredNames returns the package-format names that were explicitly listed
+// under packages: in the config file, in sorted order. Returns nil when the
+// packages: section was absent or empty.
+func (p *PackagesConfig) ConfiguredNames() []string {
+	if len(p.configured) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(p.configured))
+	for name := range p.configured {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // BrewConfig holds Homebrew formula settings.

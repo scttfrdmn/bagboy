@@ -63,6 +63,27 @@ func (r *Registry) Count() int {
 	return len(r.packagers)
 }
 
+// PackSelected invokes only the packagers whose names appear in names, skipping
+// those that fail validation. Returns the same map format as PackAll.
+func (r *Registry) PackSelected(ctx context.Context, cfg *config.Config, names []string) (map[string]string, error) {
+	results := make(map[string]string)
+	for _, name := range names {
+		p, ok := r.packagers[name]
+		if !ok {
+			continue
+		}
+		if err := p.Validate(cfg); err != nil {
+			continue
+		}
+		output, err := p.Pack(ctx, cfg)
+		if err != nil {
+			return nil, err
+		}
+		results[name] = output
+	}
+	return results, nil
+}
+
 // PackAll invokes every registered packager that passes validation and returns
 // a map from packager name to output path. The first packager error aborts the
 // run and returns that error.

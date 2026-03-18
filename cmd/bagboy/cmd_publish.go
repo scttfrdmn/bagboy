@@ -82,10 +82,19 @@ func runPublish(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("config validation failed: %w", err)
 	}
 
+	reg := newPackagerRegistry()
+	configuredNames := cfg.Packages.ConfiguredNames()
+
 	if dryRun {
 		ui.Info("Would create packages for:")
-		for _, format := range []string{"brew", "scoop", "deb", "rpm", "docker"} {
-			ui.Info(fmt.Sprintf("  • %s", format))
+		if len(configuredNames) > 0 {
+			for _, format := range configuredNames {
+				ui.Info(fmt.Sprintf("  • %s", format))
+			}
+		} else {
+			for _, format := range reg.List() {
+				ui.Info(fmt.Sprintf("  • %s", format))
+			}
 		}
 		if !skipGitHub && cfg.GitHub.Owner != "" {
 			ui.Info("Would create GitHub release and update repositories")
@@ -95,10 +104,15 @@ func runPublish(cmd *cobra.Command, _ []string) error {
 
 	fmt.Println("🚀 Publishing", cfg.Name, cfg.Version)
 
-	reg := newPackagerRegistry()
-	results, err := reg.PackAll(ctx, cfg)
-	if err != nil {
-		return err
+	var results map[string]string
+	var packErr error
+	if len(configuredNames) > 0 {
+		results, packErr = reg.PackSelected(ctx, cfg, configuredNames)
+	} else {
+		results, packErr = reg.PackAll(ctx, cfg)
+	}
+	if packErr != nil {
+		return packErr
 	}
 
 	fmt.Println("✅ Created packages:")

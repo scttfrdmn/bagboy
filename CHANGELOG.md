@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-03-18
+
+### Fixed
+- `pkg/packager/brew`: `{{.Version}}` in `installer.base_url` was written literally into formula download URLs instead of being substituted with the configured version (closes #37)
+- `cmd/bagboy publish`: ignored the `packages:` config section and attempted to build all 20 formats unconditionally; now only builds the formats explicitly listed under `packages:` — falls back to all formats when the section is absent (closes #38)
+- `pkg/packager/chocolatey`: nupkg output filename used dot separator (`name.version.nupkg`) causing a `zip I/O error` because the parent directory did not exist; changed to dash separator (`name-version.nupkg`) (closes #39)
+- `pkg/packager/dmg`: on macOS with `hdiutil` available, `Pack()` now executes the `hdiutil` pipeline to produce a real compressed disk image instead of a 103-byte scaffold stub; non-macOS and CI environments retain the scaffold behavior (closes #40)
+
+### Internal
+- `pkg/config`: `PackagesConfig` gains a custom `UnmarshalYAML` that tracks which format keys were explicitly present in YAML; new `ConfiguredNames()` method exposes the list
+- `pkg/packager`: `Registry.PackSelected()` packs only a named subset of registered packagers
+
 ## [0.9.3] - 2026-03-18
 
 ### Tests

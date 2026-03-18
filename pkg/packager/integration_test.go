@@ -22,12 +22,12 @@ package packager_test
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
-
-	"io/fs"
 
 	"github.com/scttfrdmn/bagboy/pkg/checksum"
 	"github.com/scttfrdmn/bagboy/pkg/config"
@@ -496,7 +496,11 @@ func TestIntegration_Winget_Pack_Validate_Checksum(t *testing.T) {
 }
 
 // TestIntegration_DMG_Determinism verifies that dmg.Pack produces the same checksum on repeated runs.
+// On macOS the packager invokes hdiutil, whose output embeds timestamps and is not byte-identical.
 func TestIntegration_DMG_Determinism(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("hdiutil DMGs embed timestamps; determinism check is for the scaffold path only")
+	}
 	tmpDir := t.TempDir()
 	chdir(t, tmpDir)
 

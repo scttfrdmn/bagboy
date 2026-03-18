@@ -3,14 +3,28 @@ package dmg
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/scttfrdmn/bagboy/pkg/config"
 )
 
+// skipIfHdiutil skips the test when running on macOS with hdiutil available,
+// because in that case Pack() invokes hdiutil instead of writing a scaffold file.
+func skipIfHdiutil(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "darwin" {
+		if _, err := exec.LookPath("hdiutil"); err == nil {
+			t.Skip("scaffold behavior not exercised when hdiutil is available")
+		}
+	}
+}
+
 func TestDMGPackager(t *testing.T) {
+	skipIfHdiutil(t)
 	// Create test binary
 	testDir := t.TempDir()
 	testBinary := filepath.Join(testDir, "test-darwin-amd64")
@@ -86,6 +100,7 @@ func TestDMGPackager_Name(t *testing.T) {
 }
 
 func TestDMGPack_BuildScriptContent(t *testing.T) {
+	skipIfHdiutil(t)
 	testDir := t.TempDir()
 	testBinary := filepath.Join(testDir, "myapp-darwin-amd64")
 	if err := os.WriteFile(testBinary, []byte("fake binary"), 0755); err != nil {
@@ -148,6 +163,7 @@ func TestDMGPack_BuildScriptContent(t *testing.T) {
 }
 
 func TestDMGPack_CopiesBinaryToContents(t *testing.T) {
+	skipIfHdiutil(t)
 	testDir := t.TempDir()
 	binaryContent := []byte("fake macos binary content")
 	testBinary := filepath.Join(testDir, "myapp-darwin-arm64")

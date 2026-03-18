@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/scttfrdmn/bagboy/pkg/config"
@@ -71,6 +72,9 @@ end`
 		return "", err
 	}
 
+	// Interpolate {{.Version}} in the base URL so download URLs are fully resolved.
+	baseURL := strings.ReplaceAll(cfg.Installer.BaseURL, "{{.Version}}", cfg.Version)
+
 	data := struct {
 		*config.Config
 		ClassName string
@@ -79,7 +83,7 @@ end`
 	}{
 		Config:    cfg,
 		ClassName: capitalize(cfg.Name),
-		BaseURL:   cfg.Installer.BaseURL,
+		BaseURL:   baseURL,
 		Test:      cfg.Packages.Brew.Test,
 	}
 
