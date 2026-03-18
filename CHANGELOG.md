@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-03-18
+
+### Tests
+- `pkg/packager`: integration tests for dmg, cargo, pypi, nix, spack, and winget packagers — all pure-Go and macOS-compatible with no external tools required
+- `Makefile`: add `make test-integration` target
+
 ## [0.9.2] - 2026-03-18
 
 ### Security

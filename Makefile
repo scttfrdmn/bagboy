@@ -1,4 +1,4 @@
-.PHONY: build build-all test clean install run-init lint coverage quality fmt vet deps security mocks
+.PHONY: build build-all test test-integration clean install run-init lint coverage quality fmt vet deps security mocks
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.8.0-dev")
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
@@ -23,6 +23,10 @@ build-all:
 # Test the application
 test:
 	go test -v -race ./...
+
+# Run integration tests
+test-integration:
+	go test -tags integration -v -race ./pkg/packager/...
 
 # Test with coverage
 coverage:
