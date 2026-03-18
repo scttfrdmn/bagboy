@@ -18,17 +18,19 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/scttfrdmn/bagboy/pkg/config"
 	"github.com/scttfrdmn/bagboy/pkg/errors"
+	"github.com/scttfrdmn/bagboy/pkg/requirements"
 	"github.com/scttfrdmn/bagboy/pkg/ui"
 )
 
 // newValidateCmd returns the cobra Command for the 'validate' subcommand.
 func newValidateCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     "validate",
 		Aliases: []string{"v", "verify"},
 		Short:   "Validate bagboy configuration",
@@ -40,17 +42,29 @@ Checks for:
 • Binary file existence
 • GitHub repository access (if configured)
 • Package format compatibility
+• Per-format packager validation (with --format)
+• System dependency availability (with --check-deps)
 
 Examples:
-  bagboy validate               # Validate current configuration
-  bagboy validate --verbose     # Show detailed validation info`,
+  bagboy validate                      # Validate current configuration
+  bagboy validate --format brew        # Validate a specific format
+  bagboy validate --all-formats        # Validate all configured formats
+  bagboy validate --verbose            # Show detailed validation info`,
 		RunE: runValidate,
 	}
+	cmd.Flags().String("format", "", "Validate a specific package format (e.g. brew, deb, docker)")
+	cmd.Flags().Bool("all-formats", false, "Run per-format validation for all registered packagers")
+	cmd.Flags().Bool("check-deps", false, "Also check system dependency availability for each format")
+	return cmd
 }
 
 // runValidate implements the 'validate' subcommand logic.
 func runValidate(cmd *cobra.Command, _ []string) error {
 	ctx := cmd.Context()
+	formatFlag, _ := cmd.Flags().GetString("format")
+	allFormats, _ := cmd.Flags().GetBool("all-formats")
+	checkDeps, _ := cmd.Flags().GetBool("check-deps")
+
 	ui.Header("Validating Configuration")
 
 	configPath, err := config.FindConfigFile()
@@ -91,5 +105,59 @@ func runValidate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	// Per-format validation.
+	if formatFlag != "" || allFormats {
+		if err := runFormatValidation(cfg, formatFlag, checkDeps); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// runFormatValidation runs Packager.Validate() for one or all formats and
+// displays results in a table. It also optionally runs RequirementChecker.
+func runFormatValidation(cfg *config.Config, formatFlag string, checkDeps bool) error {
+	reg := newPackagerRegistry()
+
+	var formatsToCheck []string
+	if formatFlag != "" {
+		formatsToCheck = []string{strings.ToLower(strings.TrimSpace(formatFlag))}
+	} else {
+		formatsToCheck = reg.List()
+	}
+
+	ui.Header("Per-Format Validation")
+
+	tbl := ui.NewTable([]string{"Format", "Status", "Issues"})
+
+	var anyError bool
+	for _, name := range formatsToCheck {
+		p, ok := reg.Get(name)
+		if !ok {
+			tbl.AddRow([]string{name, "UNKNOWN", "packager not registered"})
+			anyError = true
+			continue
+		}
+		err := p.Validate(cfg)
+		if err != nil {
+			tbl.AddRow([]string{name, "FAIL", err.Error()})
+			anyError = true
+		} else {
+			tbl.AddRow([]string{name, "OK", "-"})
+		}
+	}
+	tbl.Print()
+
+	// Optional dependency check.
+	if checkDeps {
+		checker := requirements.NewRequirementChecker()
+		results := checker.CheckRequirements(formatsToCheck)
+		checker.PrintRequirementReport(results)
+	}
+
+	if anyError {
+		return fmt.Errorf("one or more formats failed validation; see table above")
+	}
 	return nil
 }

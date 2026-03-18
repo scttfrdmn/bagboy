@@ -1,0 +1,39 @@
+name: "{{.Name}}"
+version: "{{.Version}}"
+description: "{{.Description}}"
+author: "{{.Author}}"
+homepage: "{{.Homepage}}"
+license: "{{.License}}"
+
+binaries:
+  linux-amd64: "{{.Name}}-linux-amd64"
+  linux-arm64: "{{.Name}}-linux-arm64"
+  darwin-amd64: "{{.Name}}-darwin-amd64"
+  darwin-arm64: "{{.Name}}-darwin-arm64"
+  windows-amd64: "{{.Name}}-windows-amd64.exe"
+
+github:
+  owner: "{{.GitHubOwner}}"
+  repo: "{{.GitHubRepo}}"
+  token_env: GITHUB_TOKEN
+  release:
+    enabled: true
+    generate_notes: true
+  tap:
+    enabled: true
+    repo: "{{.GitHubOwner}}/homebrew-tap"
+    auto_create: true
+    auto_commit: true
+    auto_push: true
+  bucket:
+    enabled: true
+    repo: "{{.GitHubOwner}}/scoop-bucket"
+    auto_create: true
+    auto_commit: true
+    auto_push: true
+
+installer:
+  base_url: "https://github.com/{{.GitHubOwner}}/{{.GitHubRepo}}/releases/download/v{{`{{.Version}}`}}"
+  install_path: /usr/local/bin
+  detect_os: true
+  verify_checksum: true

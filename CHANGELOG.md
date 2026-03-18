@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-03-18
+
+### Added
+- `bagboy validate --format <name>` and `--all-formats` flags for per-packager validation results displayed in a table
+- `bagboy validate --check-deps` flag to show system dependency availability alongside validation
+- `bagboy init --template <name>` flag to generate `bagboy.yaml` from project-type presets
+- `bagboy init --list-templates` to display all available templates
+- `bagboy deploy --generate-ci [github|gitlab]` for automated CI/CD pipeline file generation
+- `pkg/templates` package with embedded YAML templates for `go-cli`, `go-service`, `node-cli`, `rust-cli` project types
+- `pkg/cicd` package with `Provider` interface and global registry
+- `pkg/cicd/github` provider: generates `.github/workflows/release.yml`
+- `pkg/cicd/gitlab` provider: generates `.gitlab-ci.yml`
+- Expanded test coverage: `pkg/vm` mock-provider tests covering all `Manager` paths
+- CLI integration tests for `cmd_sign`, `cmd_vm`, `cmd_check` subcommands
+- `pkg/signing` tests: SignPath field validation, mock-cosign PATH tests, notarize gating
+- `pkg/github` httptest-backed tests: `CreateRelease`, `UpdateTap`, `UpdateBucket`, 404/422 error handling
+- `pkg/packager/{installer,dmg,docker}` content-verification and error-path tests
+- `pkg/packager/integration_test.go` with `//go:build integration` tag for pack→validate→checksum chain
+
+### Fixed
+- `bagboy validate` no longer silently skips per-format validation
+
 ## [0.8.0-dev] - 2026-03-18
 
 ### Added

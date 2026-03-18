@@ -1,0 +1,24 @@
+name: "{{.Name}}"
+version: "{{.Version}}"
+description: "{{.Description}}"
+author: "{{.Author}}"
+homepage: "{{.Homepage}}"
+license: "{{.License}}"
+
+binaries:
+  linux-amd64: "{{.Name}}-linux-amd64"
+  linux-arm64: "{{.Name}}-linux-arm64"
+
+github:
+  owner: "{{.GitHubOwner}}"
+  repo: "{{.GitHubRepo}}"
+  token_env: GITHUB_TOKEN
+  release:
+    enabled: true
+    generate_notes: true
+
+installer:
+  base_url: "https://github.com/{{.GitHubOwner}}/{{.GitHubRepo}}/releases/download/v{{`{{.Version}}`}}"
+  install_path: /usr/local/bin
+  detect_os: true
+  verify_checksum: true

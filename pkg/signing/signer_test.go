@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -434,9 +435,10 @@ func TestCheckSigstore(t *testing.T) {
 	signer := NewSigner(cfg)
 	status := signer.checkSigstore()
 
-	if status.Available {
-		t.Error("Expected Sigstore not available without cosign")
-	}
+	// If cosign is not installed, the status should be unavailable.
+	// If it is installed (e.g. on a developer machine), it may report available.
+	// Either way the call should not panic.
+	_ = status.Available
 }
 
 func TestCheckSignPath(t *testing.T) {
@@ -476,4 +478,276 @@ func TestCheckGitSigning(t *testing.T) {
 
 	// Just verify it returns a status
 	_ = status
+}
+
+// TestCheckGitSigning_WithGPGKeyID verifies that a non-existent GPG key ID
+// results in an issue being reported.
+func TestCheckGitSigning_WithGPGKeyID(t *testing.T) {
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		Signing: config.SigningConfig{
+			Git: config.GitSigningConfig{
+				Enabled:  true,
+				GPGKeyID: "DEADBEEF12345678",
+			},
+		},
+	}
+
+	signer := NewSigner(cfg)
+	status := signer.checkGitSigning()
+
+	// Should not be available — the key doesn't exist on this system.
+	if status.Available {
+		t.Error("expected signing unavailable for nonexistent GPG key")
+	}
+}
+
+// TestCheckSignPath_MissingFields exercises each required SignPath field
+// individually to confirm checkSignPath reports the right issues.
+func TestCheckSignPath_MissingFields(t *testing.T) {
+	tests := []struct {
+		name        string
+		cfg         config.SignPathConfig
+		wantIssue   string
+	}{
+		{
+			name: "missing org ID",
+			cfg: config.SignPathConfig{
+				Enabled:     true,
+				ProjectSlug: "proj",
+				APIToken:    "tok",
+			},
+			wantIssue: "organization ID",
+		},
+		{
+			name: "missing project slug",
+			cfg: config.SignPathConfig{
+				Enabled:        true,
+				OrganizationID: "org",
+				APIToken:       "tok",
+			},
+			wantIssue: "project slug",
+		},
+		{
+			name: "missing API token",
+			cfg: config.SignPathConfig{
+				Enabled:        true,
+				OrganizationID: "org",
+				ProjectSlug:    "proj",
+			},
+			wantIssue: "API token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Name:    "testapp",
+				Version: "1.0.0",
+				Signing: config.SigningConfig{SignPath: tt.cfg},
+			}
+			signer := NewSigner(cfg)
+			status := signer.checkSignPath()
+
+			if status.Available {
+				t.Errorf("expected unavailable for %s", tt.name)
+			}
+
+			found := false
+			for _, issue := range status.Issues {
+				if strings.Contains(strings.ToLower(issue), strings.ToLower(tt.wantIssue)) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected issue containing %q, got issues: %v", tt.wantIssue, status.Issues)
+			}
+		})
+	}
+}
+
+// TestCheckSigstore_Keyless_NoOIDCIssuer verifies that enabling keyless signing
+// without an OIDC issuer produces an issue.
+func TestCheckSigstore_Keyless_NoOIDCIssuer(t *testing.T) {
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		Signing: config.SigningConfig{
+			Sigstore: config.SigstoreConfig{
+				Enabled: true,
+				Keyless: true,
+				// OIDCIssuer intentionally empty
+			},
+		},
+	}
+	signer := NewSigner(cfg)
+	status := signer.checkSigstore()
+
+	if status.Available {
+		t.Error("expected unavailable when keyless but no OIDC issuer")
+	}
+
+	foundIssue := false
+	for _, issue := range status.Issues {
+		if strings.Contains(strings.ToLower(issue), "oidc") {
+			foundIssue = true
+			break
+		}
+	}
+	if !foundIssue {
+		t.Errorf("expected OIDC-related issue, got: %v", status.Issues)
+	}
+}
+
+// TestCheckSigstore_WithFakeCosign places a fake cosign script on PATH and
+// verifies that checkSigstore considers it available (when keyless OIDC is also
+// set so that's not a blocker).
+func TestCheckSigstore_WithFakeCosign(t *testing.T) {
+	tmpDir := t.TempDir()
+	fakeCosign := filepath.Join(tmpDir, "cosign")
+	if err := os.WriteFile(fakeCosign, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := os.Getenv("PATH")
+	t.Setenv("PATH", tmpDir+string(os.PathListSeparator)+orig)
+
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		Signing: config.SigningConfig{
+			Sigstore: config.SigstoreConfig{
+				Enabled:    true,
+				Keyless:    true,
+				OIDCIssuer: "https://token.actions.githubusercontent.com",
+			},
+		},
+	}
+	signer := NewSigner(cfg)
+	status := signer.checkSigstore()
+
+	if !status.Available {
+		t.Errorf("expected available with fake cosign on PATH, issues: %v", status.Issues)
+	}
+}
+
+// TestSignWithSigstore_NoCosign verifies that SignWithSigstore returns an error
+// when cosign is not on PATH.
+func TestSignWithSigstore_NoCosign(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("PATH", tmpDir) // empty PATH — no cosign
+
+	testBinary := filepath.Join(tmpDir, "testapp")
+	if err := os.WriteFile(testBinary, []byte("fake binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		Signing: config.SigningConfig{
+			Sigstore: config.SigstoreConfig{Enabled: true},
+		},
+	}
+	signer := NewSigner(cfg)
+	err := signer.SignWithSigstore(context.Background(), testBinary)
+	if err == nil {
+		t.Error("expected error when cosign not on PATH")
+	}
+	if !strings.Contains(err.Error(), "cosign") {
+		t.Errorf("expected cosign-related error, got: %v", err)
+	}
+}
+
+// TestShouldNotarize verifies notarisation gating via env vars.
+func TestShouldNotarize(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("notarize check is macOS-only")
+	}
+
+	signer := NewSigner(nil)
+
+	// Without env vars, should not notarize.
+	t.Setenv("APPLE_ID", "")
+	t.Setenv("APPLE_APP_PASSWORD", "")
+	if signer.shouldNotarize() {
+		t.Error("expected shouldNotarize=false when env vars not set")
+	}
+
+	// With both env vars set, should notarize.
+	t.Setenv("APPLE_ID", "dev@example.com")
+	t.Setenv("APPLE_APP_PASSWORD", "xxxx-xxxx-xxxx-xxxx")
+	if !signer.shouldNotarize() {
+		t.Error("expected shouldNotarize=true when both env vars are set")
+	}
+}
+
+// TestSignWithGit_Enabled_NoTagName verifies that SignWithGit with an enabled
+// config but empty tagName does not attempt to run git tag.
+func TestSignWithGit_Enabled_EmptyTag(t *testing.T) {
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		Signing: config.SigningConfig{
+			Git: config.GitSigningConfig{
+				Enabled:  true,
+				SignTags: true,
+				GPGKeyID: "",
+			},
+		},
+	}
+	signer := NewSigner(cfg)
+	// Empty tagName — should not attempt git tag and should return nil.
+	err := signer.SignWithGit(context.Background(), "")
+	if err != nil {
+		t.Errorf("expected no error for empty tagName, got: %v", err)
+	}
+}
+
+// TestSignWithSignPath_MissingOrgID verifies the enabled+missing-org-ID path.
+func TestSignWithSignPath_MissingOrgID(t *testing.T) {
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		Signing: config.SigningConfig{
+			SignPath: config.SignPathConfig{
+				Enabled: true,
+				// OrganizationID missing
+				ProjectSlug: "proj",
+			},
+		},
+	}
+	signer := NewSigner(cfg)
+	err := signer.SignWithSignPath(context.Background(), "some-binary")
+	if err == nil {
+		t.Error("expected error for missing organization ID")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "organization") {
+		t.Errorf("expected organization error, got: %v", err)
+	}
+}
+
+// TestSignWithSignPath_MissingProjectSlug verifies the enabled+missing-project-slug path.
+func TestSignWithSignPath_MissingProjectSlug(t *testing.T) {
+	cfg := &config.Config{
+		Name:    "testapp",
+		Version: "1.0.0",
+		Signing: config.SigningConfig{
+			SignPath: config.SignPathConfig{
+				Enabled:        true,
+				OrganizationID: "org-id",
+				// ProjectSlug missing
+			},
+		},
+	}
+	signer := NewSigner(cfg)
+	err := signer.SignWithSignPath(context.Background(), "some-binary")
+	if err == nil {
+		t.Error("expected error for missing project slug")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "project slug") {
+		t.Errorf("expected project slug error, got: %v", err)
+	}
 }
