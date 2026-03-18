@@ -69,7 +69,7 @@ func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error)
 
 func (p *Packager) createDefinitionFile(path string, cfg *config.Config, binaryPath string) error {
 	tmpl := `Bootstrap: library
-From: ubuntu:22.04
+From: ubuntu:24.04
 
 %labels
     Author {{.Author}}

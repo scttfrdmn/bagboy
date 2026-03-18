@@ -121,7 +121,7 @@ func TestDockerPack_DockerfileContent(t *testing.T) {
 	}
 	df := string(content)
 	for _, want := range []string{
-		"FROM alpine:latest",
+		"FROM alpine:3.21",
 		"FROM scratch",
 		"ENTRYPOINT [\"/myapp\"]",
 		"myapp",
@@ -141,8 +141,12 @@ func TestDockerPack_DockerfileContent(t *testing.T) {
 
 	// Verify docker-compose.yml exists and contains the image name.
 	compose, _ := os.ReadFile(filepath.Join(outputDir, "docker-compose.yml"))
-	if !strings.Contains(string(compose), "myapp") {
+	composeStr := string(compose)
+	if !strings.Contains(composeStr, "myapp") {
 		t.Error("docker-compose.yml should reference image 'myapp'")
+	}
+	if strings.Contains(composeStr, "version: '3.8'") {
+		t.Error("docker-compose.yml should not contain deprecated 'version:' field")
 	}
 
 	// Verify build script is executable.

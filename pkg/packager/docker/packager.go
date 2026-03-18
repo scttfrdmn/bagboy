@@ -95,7 +95,7 @@ func (p *Packager) createDockerfile(path string, cfg *config.Config) error {
 	}
 
 	tmpl := `# Multi-stage build for {{.Name}}
-FROM alpine:latest as builder
+FROM alpine:3.21 as builder
 
 # Install ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates tzdata
@@ -151,9 +151,7 @@ CMD ["--help"]`
 }
 
 func (p *Packager) createDockerCompose(path string, cfg *config.Config) error {
-	tmpl := `version: '3.8'
-
-services:
+	tmpl := `services:
   {{.Name}}:
     build: .
     image: {{.ImageName}}:{{.Version}}

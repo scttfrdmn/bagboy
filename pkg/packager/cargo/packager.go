@@ -83,7 +83,7 @@ name = "{{.Name}}"
 path = "src/main.rs"
 
 [dependencies]
-reqwest = { version = "0.11", features = ["blocking"] }
+reqwest = { version = "0.12", features = ["blocking"] }
 tokio = { version = "1.0", features = ["full"] }
 dirs = "5.0"
 flate2 = "1.0"

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -78,7 +79,7 @@ type Spinner struct {
 	chars   []string
 	current int
 	message string
-	active  bool
+	active  int32 // accessed atomically: 0 = stopped, 1 = running
 }
 
 // NewSpinner creates a new Spinner with the given status message.
@@ -93,17 +94,17 @@ func NewSpinner(message string) *Spinner {
 // The goroutine exits when either Stop is called or ctx is cancelled,
 // preventing a goroutine leak on context cancellation.
 func (s *Spinner) Start(ctx context.Context) {
-	s.active = true
+	atomic.StoreInt32(&s.active, 1)
 	go func() {
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
-				s.active = false
+				atomic.StoreInt32(&s.active, 0)
 				return
 			case <-ticker.C:
-				if !s.active {
+				if atomic.LoadInt32(&s.active) == 0 {
 					return
 				}
 				fmt.Printf("\r%s %s", s.chars[s.current], s.message)
@@ -115,7 +116,7 @@ func (s *Spinner) Start(ctx context.Context) {
 
 // Stop halts the spinner and clears the line.
 func (s *Spinner) Stop() {
-	s.active = false
+	atomic.StoreInt32(&s.active, 0)
 	fmt.Print("\r" + strings.Repeat(" ", len(s.message)+10) + "\r")
 }
 

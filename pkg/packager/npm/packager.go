@@ -73,7 +73,7 @@ func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error)
 		},
 		"preferGlobal": true,
 		"engines": map[string]string{
-			"node": ">=14.0.0",
+			"node": ">=20.0.0",
 		},
 	}
 

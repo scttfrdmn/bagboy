@@ -3,6 +3,7 @@ package deb
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -10,6 +11,9 @@ import (
 )
 
 func TestDEBPackager(t *testing.T) {
+	if _, err := exec.LookPath("dpkg-deb"); err != nil {
+		t.Skip("dpkg-deb not available on this host")
+	}
 	// Create test binary
 	testDir := t.TempDir()
 	testBinary := filepath.Join(testDir, "test-linux-amd64")
@@ -207,6 +211,9 @@ func TestCreateTarGz_Error(t *testing.T) {
 }
 
 func TestAddFileToAr(t *testing.T) {
+	if _, err := exec.LookPath("dpkg-deb"); err != nil {
+		t.Skip("dpkg-deb not available on this host")
+	}
 	// This test is more complex since addFileToAr requires an ar.Writer
 	// We'll test it indirectly through the Pack method which uses it
 	packager := New()

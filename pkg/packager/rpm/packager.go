@@ -213,7 +213,7 @@ func getVMImage(cfg *config.Config) string {
 	if cfg.VM.Docker.Image != "" {
 		return cfg.VM.Docker.Image
 	}
-	return "fedora:38"
+	return "fedora:41"
 }
 
 func (p *Packager) copyFile(src, dst string) error {

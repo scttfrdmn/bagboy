@@ -72,7 +72,7 @@ description: |
 
 grade: stable
 confinement: strict
-base: core22
+base: core24
 
 apps:
   {{.Name}}:

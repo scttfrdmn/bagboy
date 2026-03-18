@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +22,7 @@ func TestInitCommand(t *testing.T) {
 	os.WriteFile("main.go", []byte("package main\n\nfunc main() {}\n"), 0644)
 
 	// Test init command (non-interactive by default)
+	resetAllFlags(rootCmd)
 	cmd := rootCmd
 	cmd.SetArgs([]string{"init"})
 
@@ -82,6 +82,7 @@ packages:
 	os.WriteFile("bagboy.yaml", []byte(config), 0644)
 
 	// Test pack command with specific format
+	resetAllFlags(rootCmd)
 	cmd := rootCmd
 	cmd.SetArgs([]string{"pack", "--brew"})
 
@@ -120,9 +121,10 @@ func TestValidateCommand(t *testing.T) {
 	os.WriteFile("bagboy.yaml", []byte(config), 0644)
 
 	// Test validate command
+	resetAllFlags(rootCmd)
 	cmd := rootCmd
 	cmd.SetArgs([]string{"validate"})
-	
+
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
@@ -132,10 +134,11 @@ func TestValidateCommand(t *testing.T) {
 		t.Error("validate command should have failed with invalid config")
 	}
 
-	// Check error output
-	output := buf.String()
-	if !strings.Contains(output, "validation") {
-		t.Errorf("Expected validation error message, got: %s", output)
+	// ui.Error() writes to os.Stdout (not the cobra output writer), so check
+	// the returned error value for the expected keyword instead.
+	if !strings.Contains(strings.ToLower(err.Error()), "validation") &&
+		!strings.Contains(strings.ToLower(buf.String()), "validation") {
+		t.Errorf("Expected validation error message, got err=%v buf=%s", err, buf.String())
 	}
 }
 
@@ -158,6 +161,7 @@ binaries:
 	os.WriteFile("bagboy.yaml", []byte(config), 0644)
 
 	// Test sign --check command
+	resetAllFlags(rootCmd)
 	cmd := rootCmd
 	cmd.SetArgs([]string{"sign", "--check"})
 
@@ -172,6 +176,7 @@ binaries:
 
 func TestHelpCommand(t *testing.T) {
 	// Test help command
+	resetAllFlags(rootCmd)
 	cmd := rootCmd
 	cmd.SetArgs([]string{"--help"})
 	
@@ -236,6 +241,7 @@ packages:
 	os.WriteFile("bagboy.yaml", []byte(config), 0644)
 
 	// Test pack with formats that don't require external tools
+	resetAllFlags(rootCmd)
 	cmd := rootCmd
 	cmd.SetArgs([]string{"pack", "--brew", "--scoop", "--installer"})
 
@@ -317,38 +323,39 @@ func TestCLICommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a new root command for each test
+			// Create a new root command for each test to avoid shared state.
 			cmd := &cobra.Command{
-				Use: "bagboy",
+				Use:  "bagboy",
+				Long: "🎒 bagboy - Universal Software Packager\n\nPack once. Ship everywhere.",
 			}
-			
-			// Add subcommands with improved help text
+
+			// version: use cmd.Println so output is captured by cmd.SetOut.
 			cmd.AddCommand(&cobra.Command{
 				Use:   "version",
 				Short: "Show version information",
-				Run: func(cmd *cobra.Command, args []string) {
-					fmt.Println("bagboy version 0.6.0-dev")
+				Run: func(c *cobra.Command, args []string) {
+					c.Println("bagboy version 0.6.0-dev")
 				},
 			})
-			
+
+			// pack: no Long so --help shows the Short text.
 			cmd.AddCommand(&cobra.Command{
 				Use:   "pack",
 				Short: "Create packages for distribution",
-				Long:  "Create packages for various platforms and package managers.",
 			})
-			
+
 			cmd.AddCommand(&cobra.Command{
 				Use:   "validate",
 				Short: "Validate bagboy configuration",
 				Long:  "Validate your bagboy.yaml configuration file.",
 			})
-			
+
 			cmd.AddCommand(&cobra.Command{
 				Use:   "init",
 				Short: "Initialize a new bagboy project",
 				Long:  "Initialize a new bagboy project with smart detection.",
 			})
-			
+
 			cmd.AddCommand(&cobra.Command{
 				Use:   "publish",
 				Short: "Pack all formats and create GitHub release",

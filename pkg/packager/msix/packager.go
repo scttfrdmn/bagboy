@@ -89,7 +89,7 @@ func (p *Packager) createManifest(path string, cfg *config.Config) error {
   </Properties>
   
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22000.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
   
   <Applications>

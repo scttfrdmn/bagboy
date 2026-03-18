@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-03-18
+
+### Fixed
+- Docker Dockerfile: pin Alpine base image to `3.21` (was unpinned `latest`)
+- Docker Compose template: remove deprecated `version:` field (Docker Compose V2)
+- Debian/Apptainer builder image: `ubuntu:22.04` → `ubuntu:24.04` (current LTS)
+- RPM builder image: `fedora:38` → `fedora:41` (38 EOL Nov 2023)
+- npm `engines.node`: `>=14.0.0` → `>=20.0.0` (Node 14 and 18 both EOL by Mar 2026)
+- Snap: `core22` → `core24` base (Ubuntu 24.04, released May 2024)
+- Flatpak: runtime-version `22.08` → `24.08`
+- Cargo: `reqwest` `0.11` → `0.12`
+- PyPI: add Python 3.12/3.13 classifiers; raise `python_requires`/`requires-python` to `>=3.9`; `setuptools>=45` → `>=68`
+- MSIX: `MaxVersionTested` `10.0.22000.0` → `10.0.26100.0` (Windows 11 24H2)
+- `pkg/ui` Spinner: data race on `active` field resolved with `sync/atomic`
+- `cmd/bagboy` tests: Cobra flag-state leakage between test cases resolved with `resetAllFlags` helper; flag values are now reset to defaults before every `Execute()` call
+- `pkg/packager/deb` tests: skip gracefully when `dpkg-deb` is not on PATH (macOS, CI)
+- Integration tests: `--deb` in `PackMultiple` conditioned on `dpkg-deb` availability; cross-platform error allowlist broadened to cover `appimagetool`/`mksquashfs`; description-string assertions corrected to match fixture data
+
 ## [0.9.0] - 2026-03-18
 
 ### Added

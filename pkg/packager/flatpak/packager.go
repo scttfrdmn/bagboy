@@ -52,7 +52,7 @@ func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error)
 	manifest := map[string]interface{}{
 		"app-id":          appId,
 		"runtime":         "org.freedesktop.Platform",
-		"runtime-version": "22.08",
+		"runtime-version": "24.08",
 		"sdk":             "org.freedesktop.Sdk",
 		"command":         cfg.Name,
 		"finish-args": []string{

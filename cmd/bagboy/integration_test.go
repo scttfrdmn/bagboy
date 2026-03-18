@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,6 +23,7 @@ func TestEndToEndWorkflow(t *testing.T) {
 		os.WriteFile("main.go", []byte("package main\n\nfunc main() {\n\tprintln(\"Hello, World!\")\n}\n"), 0644)
 
 		// Run bagboy init
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"init"})
 		
@@ -92,6 +94,7 @@ packages:
 
 	// Step 3: Validate configuration
 	t.Run("Validate", func(t *testing.T) {
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"validate"})
 		
@@ -115,6 +118,7 @@ packages:
 
 		for _, format := range formats {
 			t.Run(format.name, func(t *testing.T) {
+				resetAllFlags(rootCmd)
 				cmd := rootCmd
 				cmd.SetArgs([]string{"pack", format.flag})
 				
@@ -148,20 +152,25 @@ packages:
 
 	// Step 5: Pack multiple formats
 	t.Run("PackMultiple", func(t *testing.T) {
+		resetAllFlags(rootCmd)
+		args := []string{"pack", "--brew", "--scoop", "--installer"}
+		expectedFiles := []string{
+			"dist/testapp.rb",
+			"dist/testapp.json",
+			"dist/install.sh",
+		}
+		// Only include --deb when the native tool is available on this host.
+		if _, err := exec.LookPath("dpkg-deb"); err == nil {
+			args = append(args, "--deb")
+			expectedFiles = append(expectedFiles, "dist/testapp_1.0.0_amd64.deb")
+		}
+
 		cmd := rootCmd
-		cmd.SetArgs([]string{"pack", "--brew", "--scoop", "--installer", "--deb"})
-		
+		cmd.SetArgs(args)
+
 		err := cmd.Execute()
 		if err != nil {
 			t.Fatalf("bagboy pack multiple failed: %v", err)
-		}
-
-		// Verify all expected files were created
-		expectedFiles := []string{
-			"dist/testapp.rb",
-			"dist/testapp.json", 
-			"dist/install.sh",
-			"dist/testapp_1.0.0_amd64.deb",
 		}
 
 		for _, file := range expectedFiles {
@@ -173,6 +182,7 @@ packages:
 
 	// Step 6: Check signing status
 	t.Run("CheckSigning", func(t *testing.T) {
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"sign", "--check"})
 		
@@ -186,6 +196,7 @@ packages:
 	// Step 7: Test basic pack command instead of full publish
 	t.Run("PackBasicFormats", func(t *testing.T) {
 		// Test packing only formats that don't require external tools
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"pack", "--brew", "--scoop", "--installer"})
 		
@@ -246,16 +257,26 @@ func TestCrossFormatCompatibility(t *testing.T) {
 
 		for _, test := range platformTests {
 			t.Run(test.name, func(t *testing.T) {
+				resetAllFlags(rootCmd)
 				args := append([]string{"pack"}, test.formats...)
 				cmd := rootCmd
 				cmd.SetArgs(args)
-				
+
 				err := cmd.Execute()
 				if err != nil {
-					// Allow failures for tools that require external dependencies
-					if !strings.Contains(err.Error(), "not found") && 
-					   !strings.Contains(err.Error(), "zip failed") &&
-					   !strings.Contains(err.Error(), "rpmbuild") {
+					// Allow failures caused by missing host-system tools.
+					missingToolErrors := []string{
+						"not found", "dpkg-deb", "rpmbuild",
+						"appimagetool", "mksquashfs", "zip failed",
+					}
+					isMissingTool := false
+					for _, s := range missingToolErrors {
+						if strings.Contains(err.Error(), s) {
+							isMissingTool = true
+							break
+						}
+					}
+					if !isMissingTool {
 						t.Errorf("Platform %s formats failed: %v", test.name, err)
 					}
 				}
@@ -278,6 +299,7 @@ func TestErrorRecovery(t *testing.T) {
 
 	t.Run("MissingConfig", func(t *testing.T) {
 		// Test commands without bagboy.yaml
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"pack", "--brew"})
 		
@@ -299,6 +321,7 @@ invalid_yaml: [unclosed
 `
 		os.WriteFile("bagboy.yaml", []byte(invalidConfig), 0644)
 
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"validate"})
 		
@@ -321,6 +344,7 @@ binaries:
 `
 		os.WriteFile("bagboy.yaml", []byte(config), 0644)
 
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"pack", "--installer"})
 		
@@ -342,6 +366,7 @@ func TestPackageValidation(t *testing.T) {
 	setupComprehensiveTest(t)
 
 	t.Run("BrewFormula", func(t *testing.T) {
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"pack", "--brew"})
 		
@@ -363,7 +388,7 @@ func TestPackageValidation(t *testing.T) {
 		formula := string(content)
 		requiredElements := []string{
 			"class Testapp",
-			"desc \"Test application\"",
+			"desc \"Test application for comprehensive testing\"",
 			"homepage \"https://github.com/test/testapp\"",
 			"version \"1.0.0\"",
 			"def install",
@@ -377,6 +402,7 @@ func TestPackageValidation(t *testing.T) {
 	})
 
 	t.Run("ScoopManifest", func(t *testing.T) {
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"pack", "--scoop"})
 		
@@ -398,7 +424,7 @@ func TestPackageValidation(t *testing.T) {
 		manifest := string(content)
 		requiredElements := []string{
 			"\"version\": \"1.0.0\"",
-			"\"description\": \"Test application\"",
+			"\"description\": \"Test application for comprehensive testing\"",
 			"\"homepage\": \"https://github.com/test/testapp\"",
 			"\"license\": \"MIT\"",
 		}
@@ -411,6 +437,7 @@ func TestPackageValidation(t *testing.T) {
 	})
 
 	t.Run("InstallScript", func(t *testing.T) {
+		resetAllFlags(rootCmd)
 		cmd := rootCmd
 		cmd.SetArgs([]string{"pack", "--installer"})
 		

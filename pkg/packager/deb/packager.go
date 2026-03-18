@@ -163,7 +163,7 @@ func getVMImage(cfg *config.Config) string {
 	if cfg.VM.Docker.Image != "" {
 		return cfg.VM.Docker.Image
 	}
-	return "ubuntu:22.04"
+	return "ubuntu:24.04"
 }
 
 func (p *Packager) createControlFile(path string, cfg *config.Config) error {
