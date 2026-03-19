@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-03-18
+
+### Added
+- `pkg/packager/msi`: cross-platform MSI builds via `wixl` from `msitools` (`brew install msitools` on macOS, `apt install msitools` on Linux) — no Wine or Windows required
+- `pkg/packager/msi`: multi-arch support — one MSI is produced per available `windows-*` binary (`windows-amd64` → x64, `windows-arm64` → arm64, `windows-386` → x86); output is `dist/msi/`
+- `pkg/packager/msi`: removed `WixUIExtension`/`WixUI_InstallDir`/`WixVariable` from WiX template for `wixl` compatibility (WiX toolset builds are unaffected)
+
 ## [0.9.5] - 2026-03-18
 
 ### Fixed

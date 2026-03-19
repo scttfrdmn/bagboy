@@ -3,6 +3,7 @@ package msi
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestMSIPack(t *testing.T) {
 	}
 
 	packager := New()
-	
+
 	// Change to temp directory for test
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
@@ -85,22 +86,23 @@ func TestMSIPack(t *testing.T) {
 
 	ctx := context.Background()
 	outputPath, err := packager.Pack(ctx, cfg)
-	
-	// Should not error even if WiX/go-msi is not available
-	// The function should return an error about tools not being found
+
+	// Should not error even if MSI build tools are not available.
 	if err != nil && !contains(err.Error(), "MSI build tools not found") {
 		t.Errorf("Pack() unexpected error = %v", err)
 	}
 
-	// If tools are available, check output
+	// If tools are available, output should be the dist/msi directory.
 	if err == nil {
 		if outputPath == "" {
 			t.Error("Pack() returned empty output path")
 		}
-		
-		// Check if WiX file was created
-		wxsPath := filepath.Join("dist", "msi-build", "testapp.wxs")
-		if _, err := os.Stat(wxsPath); os.IsNotExist(err) {
+		if _, statErr := os.Stat(outputPath); statErr != nil {
+			t.Errorf("Pack() output path not found: %v", statErr)
+		}
+		// WiX source file should have been created in the per-arch build dir.
+		wxsPath := filepath.Join("dist", "msi-build-amd64", "testapp.wxs")
+		if _, statErr := os.Stat(wxsPath); os.IsNotExist(statErr) {
 			t.Error("WiX source file was not created")
 		}
 	}
@@ -352,32 +354,57 @@ func TestCreatePowerShellScript(t *testing.T) {
 
 func TestBuildMSI_NoTools(t *testing.T) {
 	packager := New()
-	
+
 	tmpDir := t.TempDir()
 	wxsPath := filepath.Join(tmpDir, "test.wxs")
-	cfg := &config.Config{
-		Name:    "testapp",
-		Version: "1.0.0",
-	}
 
-	// Create a dummy WXS file
+	// Create a dummy WXS file.
 	os.WriteFile(wxsPath, []byte("<?xml version=\"1.0\"?><Wix></Wix>"), 0644)
 
-	// Change to temp directory
+	// Change to temp directory.
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
 	os.Chdir(tmpDir)
 
+	outputPath := filepath.Join(tmpDir, "test.msi")
 	ctx := context.Background()
-	_, err := packager.buildMSI(ctx, tmpDir, wxsPath, cfg)
-	
-	// Should return error about missing tools
+	err := packager.buildMSI(ctx, tmpDir, wxsPath, outputPath, "x64")
+
+	// Should return error about missing tools (unless wixl is installed).
 	if err == nil {
-		t.Error("buildMSI() should fail when no MSI build tools are available")
+		t.Skip("MSI build tool (wixl/WiX/go-msi) is available — skipping no-tools test")
 	}
-	
 	if !contains(err.Error(), "MSI build tools not found") {
 		t.Errorf("Expected 'MSI build tools not found' error, got: %v", err)
+	}
+}
+
+func TestWindowsArchToWix(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"windows-amd64", "x64"},
+		{"windows-arm64", "arm64"},
+		{"windows-386", "x86"},
+		{"windows-unknown", "x64"}, // default
+	}
+	for _, c := range cases {
+		if got := windowsArchToWix(c.in); got != c.want {
+			t.Errorf("windowsArchToWix(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestBuildWithWixl_NotAvailable(t *testing.T) {
+	if _, err := exec.LookPath("wixl"); err == nil {
+		t.Skip("wixl is available — skipping unavailable-tool test")
+	}
+	packager := New()
+	tmpDir := t.TempDir()
+	err := packager.buildWithWixl(context.Background(),
+		filepath.Join(tmpDir, "test.wxs"),
+		filepath.Join(tmpDir, "test.msi"),
+		"x64")
+	if err == nil {
+		t.Error("buildWithWixl() should fail when wixl is not installed")
 	}
 }
 

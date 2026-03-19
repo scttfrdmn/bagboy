@@ -29,7 +29,6 @@ func (p *Packager) Name() string {
 
 // Validate checks that cfg has the required fields for msi packaging.
 func (p *Packager) Validate(cfg *config.Config) error {
-	// Find Windows binary
 	for arch := range cfg.Binaries {
 		if strings.HasPrefix(arch, "windows-") {
 			return nil
@@ -38,51 +37,81 @@ func (p *Packager) Validate(cfg *config.Config) error {
 	return fmt.Errorf("no Windows binary found for MSI creation")
 }
 
-// Pack generates msi artifacts from cfg and returns the output path.
+// Pack generates msi artifacts from cfg and returns the output directory path.
+// One MSI is produced per available windows-* binary (x64, arm64, x86).
+// Install msitools ("brew install msitools") to build on macOS/Linux.
 func (p *Packager) Pack(ctx context.Context, cfg *config.Config) (string, error) {
-	// Find Windows binary
-	var windowsBinary string
-	for arch, path := range cfg.Binaries {
-		if strings.HasPrefix(arch, "windows-") {
-			windowsBinary = path
-			break
+	outDir := filepath.Join("dist", "msi")
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	built := 0
+	for arch, binPath := range cfg.Binaries {
+		if !strings.HasPrefix(arch, "windows-") {
+			continue
 		}
+
+		wixArch := windowsArchToWix(arch)
+		suffix := arch[len("windows-"):] // amd64, arm64, 386
+
+		buildDir := filepath.Join("dist", "msi-build-"+suffix)
+		if err := os.MkdirAll(buildDir, 0755); err != nil {
+			return "", fmt.Errorf("failed to create build directory: %w", err)
+		}
+
+		// Copy binary.
+		binaryDest := filepath.Join(buildDir, cfg.Name+".exe")
+		if err := p.copyFile(binPath, binaryDest); err != nil {
+			return "", fmt.Errorf("failed to copy binary: %w", err)
+		}
+
+		// Generate WiX source file.
+		wxsPath := filepath.Join(buildDir, cfg.Name+".wxs")
+		if err := p.createWixSource(wxsPath, cfg, binaryDest); err != nil {
+			return "", fmt.Errorf("failed to generate WiX file: %w", err)
+		}
+
+		outputPath := filepath.Join(outDir, fmt.Sprintf("%s-%s-%s.msi", cfg.Name, cfg.Version, suffix))
+		if err := p.buildMSI(ctx, buildDir, wxsPath, outputPath, wixArch); err != nil {
+			return "", err
+		}
+		built++
 	}
 
-	// Create build directory
-	buildDir := filepath.Join("dist", "msi-build")
-	if err := os.MkdirAll(buildDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create build directory: %w", err)
+	if built == 0 {
+		return "", fmt.Errorf("no Windows binaries were processed")
 	}
 
-	// Copy binary
-	binaryDest := filepath.Join(buildDir, cfg.Name+".exe")
-	if err := p.copyFile(windowsBinary, binaryDest); err != nil {
-		return "", fmt.Errorf("failed to copy binary: %w", err)
-	}
+	return outDir, nil
+}
 
-	// Generate WiX source file
-	wxsPath := filepath.Join(buildDir, cfg.Name+".wxs")
-	if err := p.createWixSource(wxsPath, cfg, binaryDest); err != nil {
-		return "", fmt.Errorf("failed to generate WiX file: %w", err)
+// windowsArchToWix maps a windows-* architecture string to the wixl/WiX arch flag.
+func windowsArchToWix(arch string) string {
+	switch arch {
+	case "windows-arm64":
+		return "arm64"
+	case "windows-386":
+		return "x86"
+	default: // windows-amd64
+		return "x64"
 	}
-
-	// Build MSI
-	return p.buildMSI(ctx, buildDir, wxsPath, cfg)
 }
 
 func (p *Packager) createWixSource(path string, cfg *config.Config, binaryPath string) error {
+	// This template is compatible with both wixl (msitools) and the WiX toolset.
+	// WixUI elements are omitted because wixl does not support WixUIExtension.
 	tmpl := `<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" 
-           Name="{{.Name}}" 
-           Language="1033" 
-           Version="{{.Version}}.0" 
-           Manufacturer="{{.AuthorName}}" 
+  <Product Id="*"
+           Name="{{.Name}}"
+           Language="1033"
+           Version="{{.Version}}.0"
+           Manufacturer="{{.AuthorName}}"
            UpgradeCode="{{.UpgradeCode}}">
-    
-    <Package InstallerVersion="200" 
-             Compressed="yes" 
+
+    <Package InstallerVersion="200"
+             Compressed="yes"
              InstallScope="perMachine"
              Description="{{.Description}}"
              Comments="{{.Description}}" />
@@ -105,14 +134,14 @@ func (p *Packager) createWixSource(path string, cfg *config.Config, binaryPath s
 
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="MainExecutable" Guid="{{.ComponentGuid}}">
-        <File Id="MainExe" 
-              Source="{{.BinaryPath}}" 
+        <File Id="MainExe"
+              Source="{{.BinaryPath}}"
               KeyPath="yes"
               Name="{{.Name}}.exe" />
-        
+
         <!-- Add to PATH -->
         <Environment Id="PATH" Name="PATH" Value="[INSTALLFOLDER]" Permanent="no" Part="last" Action="set" System="yes" />
-        
+
         <!-- Start Menu shortcut -->
         <Shortcut Id="ApplicationStartMenuShortcut"
                   Name="{{.Name}}"
@@ -120,32 +149,25 @@ func (p *Packager) createWixSource(path string, cfg *config.Config, binaryPath s
                   Target="[#MainExe]"
                   WorkingDirectory="INSTALLFOLDER"
                   Directory="ApplicationProgramsFolder" />
-        
+
         <!-- Remove start menu folder on uninstall -->
         <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
-        
+
         <!-- Registry key for Add/Remove Programs -->
-        <RegistryValue Root="HKCU" 
-                       Key="Software\{{.AuthorName}}\{{.Name}}" 
-                       Name="installed" 
-                       Type="integer" 
-                       Value="1" 
+        <RegistryValue Root="HKCU"
+                       Key="Software\{{.AuthorName}}\{{.Name}}"
+                       Name="installed"
+                       Type="integer"
+                       Value="1"
                        KeyPath="no" />
       </Component>
     </ComponentGroup>
 
-    <!-- UI -->
-    <UIRef Id="WixUI_InstallDir" />
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    
-    <!-- License -->
-    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
-    
     <!-- Custom properties -->
     <Property Id="ARPURLINFOABOUT" Value="{{.Homepage}}" />
     <Property Id="ARPCONTACT" Value="{{.AuthorName}}" />
     <Property Id="ARPHELPLINK" Value="{{.Homepage}}" />
-    
+
   </Product>
 </Wix>`
 
@@ -160,7 +182,6 @@ func (p *Packager) createWixSource(path string, cfg *config.Config, binaryPath s
 	}
 	defer f.Close()
 
-	// Parse author name
 	authorName := cfg.Author
 	if strings.Contains(cfg.Author, "<") {
 		parts := strings.Split(cfg.Author, "<")
@@ -320,26 +341,48 @@ Write-Host "  ./$MsiFile                    (Interactive install)" -ForegroundCo
 	return t.Execute(f, cfg)
 }
 
-func (p *Packager) buildMSI(ctx context.Context, buildDir, wxsPath string, cfg *config.Config) (string, error) {
-	outputPath := filepath.Join("dist", fmt.Sprintf("%s-%s.msi", cfg.Name, cfg.Version))
+// buildMSI tries available MSI build tools in priority order:
+//  1. wixl (msitools) — "brew install msitools" — works on macOS and Linux for any arch
+//  2. WiX candle/light — Windows only
+//  3. go-msi — any platform
+func (p *Packager) buildMSI(ctx context.Context, buildDir, wxsPath, outputPath, wixArch string) error {
+	// wixl (msitools): cross-platform, supports --arch x64|arm64|x86
+	if _, err := exec.LookPath("wixl"); err == nil {
+		return p.buildWithWixl(ctx, wxsPath, outputPath, wixArch)
+	}
 
-	// Check if we're on Windows and have WiX tools
+	// WiX candle/light: Windows only
 	if runtime.GOOS == "windows" {
 		if err := p.buildWithWix(ctx, buildDir, wxsPath, outputPath); err == nil {
-			return outputPath, nil
+			return nil
 		}
 	}
 
-	// Check for go-msi
+	// go-msi: any platform, wraps WiX
 	if _, err := exec.LookPath("go-msi"); err == nil {
-		return p.buildWithGoMSI(ctx, buildDir, cfg, outputPath)
+		cfg := &config.Config{} // go-msi path reuses existing wix.json
+		_, err := p.buildWithGoMSI(ctx, buildDir, cfg, outputPath)
+		return err
 	}
 
-	return "", fmt.Errorf("MSI build tools not found - install WiX Toolset (Windows) or go-msi")
+	return fmt.Errorf("MSI build tools not found - install WiX Toolset (Windows), go-msi, or msitools (brew install msitools)")
+}
+
+// buildWithWixl calls wixl from the msitools package.
+// Install on macOS: brew install msitools
+// Install on Linux: apt install msitools / dnf install msitools
+func (p *Packager) buildWithWixl(ctx context.Context, wxsPath, outputPath, arch string) error {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, "wixl", "--arch", arch, "-o", outputPath, wxsPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("wixl failed: %w\n%s", err, out)
+	}
+	return nil
 }
 
 func (p *Packager) buildWithWix(ctx context.Context, buildDir, wxsPath, outputPath string) error {
-	// Check for WiX tools
 	if _, err := exec.LookPath("candle"); err != nil {
 		return fmt.Errorf("candle not found")
 	}
@@ -347,16 +390,14 @@ func (p *Packager) buildWithWix(ctx context.Context, buildDir, wxsPath, outputPa
 		return fmt.Errorf("light not found")
 	}
 
-	// Compile WiX source
 	wixobjPath := strings.TrimSuffix(wxsPath, ".wxs") + ".wixobj"
-	
+
 	candleCmd := exec.CommandContext(ctx, "candle", "-out", wixobjPath, wxsPath)
 	candleCmd.Dir = buildDir
 	if output, err := candleCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("candle failed: %w\nOutput: %s", err, output)
 	}
 
-	// Link MSI
 	lightCmd := exec.CommandContext(ctx, "light", "-out", outputPath, wixobjPath, "-ext", "WixUIExtension")
 	lightCmd.Dir = buildDir
 	if output, err := lightCmd.CombinedOutput(); err != nil {
@@ -367,7 +408,6 @@ func (p *Packager) buildWithWix(ctx context.Context, buildDir, wxsPath, outputPa
 }
 
 func (p *Packager) buildWithGoMSI(ctx context.Context, buildDir string, cfg *config.Config, outputPath string) (string, error) {
-	// Create go-msi configuration
 	goMSIConfig := fmt.Sprintf(`{
   "product-name": "%s",
   "company-name": "%s",
@@ -388,10 +428,9 @@ func (p *Packager) buildWithGoMSI(ctx context.Context, buildDir string, cfg *con
 		return "", err
 	}
 
-	// Build with go-msi
 	cmd := exec.CommandContext(ctx, "go-msi", "make", "--msi", outputPath, "--version", cfg.Version)
 	cmd.Dir = buildDir
-	
+
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("go-msi failed: %w\nOutput: %s", err, output)
 	}
@@ -400,7 +439,6 @@ func (p *Packager) buildWithGoMSI(ctx context.Context, buildDir string, cfg *con
 }
 
 func (p *Packager) generateUpgradeCode(cfg *config.Config) string {
-	// Generate a deterministic GUID based on app name
 	hash := 0
 	for _, c := range cfg.Name {
 		hash = hash*31 + int(c)
