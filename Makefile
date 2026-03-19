@@ -1,4 +1,4 @@
-.PHONY: build build-all test test-integration clean install run-init lint coverage quality fmt vet deps security mocks
+.PHONY: build build-all dist bump-version test test-integration clean install run-init lint coverage quality fmt vet deps security mocks
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.8.0-dev")
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
@@ -14,11 +14,23 @@ build:
 
 # Build for all platforms
 build-all:
-	GOOS=darwin  GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-darwin-amd64 ./cmd/bagboy
-	GOOS=darwin  GOARCH=arm64 go build $(LDFLAGS) -o dist/bagboy-darwin-arm64 ./cmd/bagboy
-	GOOS=linux   GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-linux-amd64  ./cmd/bagboy
-	GOOS=linux   GOARCH=arm64 go build $(LDFLAGS) -o dist/bagboy-linux-arm64  ./cmd/bagboy
-	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-windows-amd64.exe ./cmd/bagboy
+	GOOS=darwin  GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-darwin-amd64       ./cmd/bagboy
+	GOOS=darwin  GOARCH=arm64 go build $(LDFLAGS) -o dist/bagboy-darwin-arm64       ./cmd/bagboy
+	GOOS=linux   GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-linux-amd64        ./cmd/bagboy
+	GOOS=linux   GOARCH=arm64 go build $(LDFLAGS) -o dist/bagboy-linux-arm64        ./cmd/bagboy
+	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/bagboy-windows-amd64.exe  ./cmd/bagboy
+	GOOS=windows GOARCH=arm64 go build $(LDFLAGS) -o dist/bagboy-windows-arm64.exe  ./cmd/bagboy
+
+# Build all platform binaries then package them with bagboy itself
+dist: build build-all
+	./bin/bagboy pack --all
+
+# Bump the version field in bagboy.yaml to match the current git tag.
+# Usage: make bump-version VERSION=1.2.3
+bump-version:
+	@[ -n "$(VERSION_ARG)" ] || { echo "Usage: make bump-version VERSION_ARG=x.y.z"; exit 1; }
+	sed -i.bak 's/^version: .*/version: $(VERSION_ARG)/' bagboy.yaml && rm -f bagboy.yaml.bak
+	@echo "bagboy.yaml version bumped to $(VERSION_ARG)"
 
 # Test the application
 test:

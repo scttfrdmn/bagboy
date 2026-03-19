@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-03-18
+
+### Changed
+- `bagboy.yaml`: updated to v0.9.7; corrected author email, fixed `signing.windows.timestamp_url` to `https://`, added `windows-arm64` binary, expanded `packages:` section to cover all supported formats, disabled `signpath` by default
+- `Makefile`: `build-all` now produces `dist/bagboy-windows-arm64.exe`; new `dist` target runs `build-all` then `bagboy pack --all`; new `bump-version` target keeps `bagboy.yaml` in sync at release time
+
 ## [0.9.6] - 2026-03-18
 
 ### Added
