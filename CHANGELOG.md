@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-03-18
+
+### Fixed
+- `cmd/bagboy publish`: pack errors (e.g. "MSI build tools not found") now emit a `⚠️ Skipping` warning and continue rather than aborting the entire publish workflow (closes #41)
+- `pkg/github`: `CreateRelease` now detects HTTP 422 `tag_name: already_exists` and falls back to fetching the existing release, then uploads assets to it — re-running `publish` after a partial failure no longer requires manually deleting the release (closes #42)
+
 ## [0.9.4] - 2026-03-18
 
 ### Fixed

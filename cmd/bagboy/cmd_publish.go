@@ -104,15 +104,30 @@ func runPublish(cmd *cobra.Command, _ []string) error {
 
 	fmt.Println("🚀 Publishing", cfg.Name, cfg.Version)
 
-	var results map[string]string
-	var packErr error
-	if len(configuredNames) > 0 {
-		results, packErr = reg.PackSelected(ctx, cfg, configuredNames)
-	} else {
-		results, packErr = reg.PackAll(ctx, cfg)
+	// Determine which packager names to run.
+	namesToPack := configuredNames
+	if len(namesToPack) == 0 {
+		namesToPack = reg.List()
 	}
-	if packErr != nil {
-		return packErr
+
+	// Pack each format; warn and continue on error so one missing build tool
+	// (e.g. WiX on macOS) does not abort the entire publish workflow.
+	results := make(map[string]string)
+	for _, name := range namesToPack {
+		p, ok := reg.Get(name)
+		if !ok {
+			continue
+		}
+		if err := p.Validate(cfg); err != nil {
+			fmt.Printf("⚠️  Skipping %s: %v\n", name, err)
+			continue
+		}
+		output, err := p.Pack(ctx, cfg)
+		if err != nil {
+			fmt.Printf("⚠️  Skipping %s: %v\n", name, err)
+			continue
+		}
+		results[name] = output
 	}
 
 	fmt.Println("✅ Created packages:")

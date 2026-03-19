@@ -4,7 +4,9 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,7 +48,18 @@ func (c *Client) CreateRelease(ctx context.Context, cfg *config.Config, assets [
 
 	rel, _, err := c.gh.Repositories.CreateRelease(ctx, cfg.GitHub.Owner, cfg.GitHub.Repo, release)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create release: %w", err)
+		// If the release already exists (HTTP 422 tag_name: already_exists), fetch it
+		// and upload assets to it rather than failing.
+		if isAlreadyExists(err) {
+			existing, _, fetchErr := c.gh.Repositories.GetReleaseByTag(ctx, cfg.GitHub.Owner, cfg.GitHub.Repo, "v"+cfg.Version)
+			if fetchErr != nil {
+				return nil, fmt.Errorf("release already exists but could not be fetched: %w", fetchErr)
+			}
+			fmt.Printf("ℹ️  Release v%s already exists — uploading assets to existing release\n", cfg.Version)
+			rel = existing
+		} else {
+			return nil, fmt.Errorf("failed to create release: %w", err)
+		}
 	}
 
 	// Upload assets
@@ -320,6 +333,24 @@ func (c *Client) createBranch(ctx context.Context, owner, repo, branchName strin
 	}
 
 	return nil
+}
+
+// isAlreadyExists reports whether err is a GitHub API 422 "already_exists" error
+// for the tag_name field, which occurs when a release for the tag already exists.
+func isAlreadyExists(err error) bool {
+	var errResp *github.ErrorResponse
+	if !errors.As(err, &errResp) {
+		return false
+	}
+	if errResp.Response == nil || errResp.Response.StatusCode != http.StatusUnprocessableEntity {
+		return false
+	}
+	for _, e := range errResp.Errors {
+		if e.Field == "tag_name" && e.Code == "already_exists" {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) updateFileOnBranch(ctx context.Context, owner, repo, branch, path, content, commitMessage string) error {
